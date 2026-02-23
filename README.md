@@ -35,3 +35,35 @@ To verify installation:
 ```bash
 node -v
 npm -v
+```
+
+## Set Up Instructions
+Open your terminal and navigate to where you want the project (e.g., Documents, Downloads)
+```bash
+cd path/to/your/desired/folder
+```
+
+Clone the repository
+```bash
+git clone https://github.com/LonghornRacingElectric/drive-day-log.git
+```
+
+Move into the project directory
+```bash
+cd drive-day-log
+```
+
+Make sure you have Node.js (v18 or newer) installed.
+Then run
+```bash
+npm install
+```
+
+You should see something like
+```bash
+Local: http://localhost:5173/
+```
+Open that URL in your browser to use the Drive Day Log. If the page is blank white, open browser console and type
+```bash
+localStorage.clear()
+```
