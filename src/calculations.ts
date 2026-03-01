@@ -4,6 +4,7 @@ export type Lap = {
     time2: number | null
     cones: number
     offTrack: number
+    isLive?: boolean
 }
 
 export function getBaseTime(lap: Lap): number | null {

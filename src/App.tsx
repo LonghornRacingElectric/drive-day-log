@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Lap } from './calculations'
 import { getBestTime, getAverageTime } from './calculations'
 import LapTable from './components/LapTable'
@@ -64,6 +64,17 @@ export default function App() {
     const saved = localStorage.getItem('driveDayDrivers')
     return saved ? JSON.parse(saved) : []
   })
+
+  const [activeTimers, setActiveTimers] = useState<
+    Record<
+      string,
+      {
+        startTime: number | null
+        elapsed: number
+        intervalId: number | null
+      }
+    >
+  >({})
   const [newDriverName, setNewDriverName] = useState('')
   const [sessionMeta, setSessionMeta] = useState<SessionMetadata>(() => {
     const saved = localStorage.getItem('driveDayMeta')
@@ -170,41 +181,16 @@ export default function App() {
 
   function updateLap(driverId: string, updatedLap: Lap) {
     setDrivers((drivers) =>
-      drivers.map((driver) => {
-        if (driver.id !== driverId) return driver
-
-        const updatedLaps = driver.laps.map((l) =>
-          l.id === updatedLap.id ? updatedLap : l
-        )
-
-        const lastLap = updatedLaps[updatedLaps.length - 1]
-
-        const isLastLap = updatedLap.id === lastLap.id
-
-        const hasTime = updatedLap.time1 != null || updatedLap.time2 != null
-
-        // If user edited the last lap AND it now has a time
-        if (isLastLap && hasTime) {
-          return {
-            ...driver,
-            laps: [
-              ...updatedLaps,
-              {
-                id: crypto.randomUUID(),
-                time1: null,
-                time2: null,
-                cones: 0,
-                offTrack: 0,
-              },
-            ],
-          }
-        }
-
-        return {
-          ...driver,
-          laps: updatedLaps,
-        }
-      })
+      drivers.map((driver) =>
+        driver.id === driverId
+          ? {
+              ...driver,
+              laps: driver.laps.map((l) =>
+                l.id === updatedLap.id ? updatedLap : l
+              ),
+            }
+          : driver
+      )
     )
   }
 
@@ -317,8 +303,114 @@ export default function App() {
       ],
     })
 
+    setTrackImage(null)
+    localStorage.removeItem('trackImage')
+
     localStorage.removeItem('driveDayDrivers')
     localStorage.removeItem('driveDayMeta')
+  }
+
+  const startRef = useRef<number>(0)
+
+  function startTimer(driver: Driver) {
+    const liveLap: Lap = {
+      id: crypto.randomUUID(),
+      time1: 0,
+      time2: null,
+      cones: 0,
+      offTrack: 0,
+      isLive: true,
+    }
+  
+    setDrivers((drivers) =>
+      drivers.map((d) =>
+        d.id === driver.id
+          ? { ...d, laps: [...d.laps, liveLap] }
+          : d
+      )
+    )
+  
+    const intervalId = window.setInterval(() => {
+      setDrivers((drivers) =>
+        drivers.map((d) => {
+          if (d.id !== driver.id) return d
+  
+          const updatedLaps = d.laps.map((lap) =>
+            lap.isLive
+              ? { ...lap, time1: (Date.now() - startRef.current) / 1000 }
+              : lap
+          )
+  
+          return { ...d, laps: updatedLaps }
+        })
+      )
+    }, 10)
+  
+    startRef.current = Date.now()
+  
+    setActiveTimers((prev) => ({
+      ...prev,
+      [driver.id]: {
+        startTime: Date.now(),
+        elapsed: 0,
+        intervalId,
+      },
+    }))
+  }
+
+  function recordLap(driver: Driver) {
+    startRef.current = Date.now()
+  
+    setDrivers((drivers) =>
+      drivers.map((d) => {
+        if (d.id !== driver.id) return d
+  
+        const finalized = d.laps.map((lap) =>
+          lap.isLive ? { ...lap, isLive: false } : lap
+        )
+  
+        const newLiveLap: Lap = {
+          id: crypto.randomUUID(),
+          time1: 0,
+          time2: null,
+          cones: 0,
+          offTrack: 0,
+          isLive: true,
+        }
+  
+        return {
+          ...d,
+          laps: [...finalized, newLiveLap],
+        }
+      })
+    )
+  }
+
+  function stopTimer(driverId: string) {
+    const timer = activeTimers[driverId]
+    if (!timer) return
+  
+    if (timer.intervalId !== null) {
+      clearInterval(timer.intervalId)
+    }
+  
+    setDrivers((drivers) =>
+      drivers.map((d) =>
+        d.id === driverId
+          ? {
+              ...d,
+              laps: d.laps.map((lap) =>
+                lap.isLive ? { ...lap, isLive: false } : lap
+              ),
+            }
+          : d
+      )
+    )
+  }
+
+  function formatTime(ms: number) {
+    const totalSeconds = ms / 1000
+    return totalSeconds.toFixed(2)
   }
 
   return (
@@ -756,7 +848,6 @@ export default function App() {
 
                 <td>
                   <input
-                    type="number"
                     value={row.initialSOC}
                     onChange={(e) =>
                       updateSOC({ ...row, initialSOC: e.target.value })
@@ -1001,12 +1092,24 @@ export default function App() {
                   deleteLap(driver.id, lapId, index)
                 }
               />
-              <button
-                style={{ marginTop: 8 }}
-                onClick={() => addLap(driver.id)}
-              >
-                Add Lap
-              </button>
+              <div style={{ marginTop: 12 }}>
+                {!activeTimers[driver.id]?.startTime ? (
+                  <button onClick={() => startTimer(driver)}>Start</button>
+                ) : (
+                  <>
+
+
+                    <button onClick={() => recordLap(driver)}>Lap</button>
+
+                    <button
+                      onClick={() => stopTimer(driver.id)}
+                      style={{ marginLeft: 8 }}
+                    >
+                      Stop
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )
         })}
