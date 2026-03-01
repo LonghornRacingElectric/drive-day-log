@@ -1,63 +1,23 @@
+// React
 import { useState, useEffect, useRef } from 'react'
-import type { Lap } from './calculations'
-import { getBestTime, getAverageTime } from './calculations'
-import LapTable from './components/LapTable'
+
+// Third party
 import { Trash2, Pencil } from 'lucide-react'
 
-type Driver = {
-  id: string
-  name: string
-  laps: Lap[]
-  sessionStart: string
-  sessionEnd: string
-  vehicle: string
-  comments: string
+// Internal utilities
+import { getBestTime, getAverageTime } from './calculations'
+import type { Lap } from './calculations'
 
-  tires?: {
-    frontRight: TireData
-    frontLeft: TireData
-    rearRight: TireData
-    rearLeft: TireData
-  }
-}
+// Internal components
+import LapTable from './components/LapTable'
 
-type TireData = {
-  coldP: string
-  coldT: string
-  hotP: string
-  hotT: string
-}
+// Internal types
+import type {
+  Driver,
+  SOCData,
+  SessionMetadata,
+} from './types/driveDay'
 
-type SOCData = {
-  id: string
-  initialSOC: string
-  finalSOC: string
-  initialVolts: string
-  finalVolts: string
-}
-
-type SessionMetadata = {
-  date: string
-  event: string
-  weather: string
-  startTime: string
-  endTime: string
-
-  sessionGoals: string
-
-  trackConditions: {
-    wind: string
-    humidity: string
-    ambientTemp: string
-    wetTrack: boolean
-    trackTemp: string
-  }
-
-  stateOfCharge: SOCData[]
-
-  powerLimit: string
-  totalDistance: string
-}
 
 export default function App() {
   const [drivers, setDrivers] = useState<Driver[]>(() => {
