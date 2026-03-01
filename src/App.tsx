@@ -12,6 +12,13 @@ type Driver = {
   sessionEnd: string
   vehicle: string
   comments: string
+
+  tires?: {
+    frontRight: TireData
+    frontLeft: TireData
+    rearRight: TireData
+    rearLeft: TireData
+  }
 }
 
 type TireData = {
@@ -44,13 +51,6 @@ type SessionMetadata = {
     ambientTemp: string
     wetTrack: boolean
     trackTemp: string
-  }
-
-  tires: {
-    frontRight: TireData
-    frontLeft: TireData
-    rearRight: TireData
-    rearLeft: TireData
   }
 
   stateOfCharge: SOCData[]
@@ -95,13 +95,6 @@ export default function App() {
             ambientTemp: '',
             trackTemp: '',
             wetTrack: false,
-          },
-
-          tires: {
-            frontRight: { coldP: '', coldT: '', hotP: '', hotT: '' },
-            frontLeft: { coldP: '', coldT: '', hotP: '', hotT: '' },
-            rearRight: { coldP: '', coldT: '', hotP: '', hotT: '' },
-            rearLeft: { coldP: '', coldT: '', hotP: '', hotT: '' },
           },
 
           stateOfCharge: [
@@ -285,13 +278,6 @@ export default function App() {
         wetTrack: false,
       },
 
-      tires: {
-        frontRight: { coldP: '', coldT: '', hotP: '', hotT: '' },
-        frontLeft: { coldP: '', coldT: '', hotP: '', hotT: '' },
-        rearRight: { coldP: '', coldT: '', hotP: '', hotT: '' },
-        rearLeft: { coldP: '', coldT: '', hotP: '', hotT: '' },
-      },
-
       stateOfCharge: [
         {
           id: crypto.randomUUID(),
@@ -314,7 +300,7 @@ export default function App() {
 
   function startTimer(driver: Driver) {
     startRef.current = Date.now()
-  
+
     const liveLap: Lap = {
       id: crypto.randomUUID(),
       time1: 0,
@@ -323,20 +309,18 @@ export default function App() {
       offTrack: 0,
       isLive: true,
     }
-  
+
     setDrivers((drivers) =>
       drivers.map((d) =>
-        d.id === driver.id
-          ? { ...d, laps: [...d.laps, liveLap] }
-          : d
+        d.id === driver.id ? { ...d, laps: [...d.laps, liveLap] } : d
       )
     )
-  
+
     const intervalId = window.setInterval(() => {
       setDrivers((drivers) =>
         drivers.map((d) => {
           if (d.id !== driver.id) return d
-  
+
           return {
             ...d,
             laps: d.laps.map((lap) =>
@@ -348,7 +332,7 @@ export default function App() {
         })
       )
     }, 10)
-  
+
     setActiveTimers((prev) => ({
       ...prev,
       [driver.id]: {
@@ -362,15 +346,15 @@ export default function App() {
   function recordLap(driver: Driver) {
     const newStart = Date.now()
     startRef.current = newStart
-  
+
     setDrivers((drivers) =>
       drivers.map((d) => {
         if (d.id !== driver.id) return d
-  
+
         const finalized = d.laps.map((lap) =>
           lap.isLive ? { ...lap, isLive: false } : lap
         )
-  
+
         const newLiveLap: Lap = {
           id: crypto.randomUUID(),
           time1: 0,
@@ -379,7 +363,7 @@ export default function App() {
           offTrack: 0,
           isLive: true,
         }
-  
+
         return {
           ...d,
           laps: [...finalized, newLiveLap],
@@ -391,11 +375,11 @@ export default function App() {
   function stopTimer(driverId: string) {
     const timer = activeTimers[driverId]
     if (!timer) return
-  
+
     if (timer.intervalId !== null) {
       clearInterval(timer.intervalId)
     }
-  
+
     // finalize live lap
     setDrivers((drivers) =>
       drivers.map((d) =>
@@ -409,7 +393,7 @@ export default function App() {
           : d
       )
     )
-  
+
     setActiveTimers((prev) => {
       const updated = { ...prev }
       delete updated[driverId]
@@ -696,139 +680,6 @@ export default function App() {
           </div>
         </div>
 
-        <h2 style={{ marginTop: 32 }}>Tires</h2>
-
-        <table
-          cellPadding={4}
-          style={{
-            borderCollapse: 'collapse',
-            width: '100%',
-            marginBottom: 32,
-          }}
-          border={1}
-        >
-          <thead>
-            <tr>
-              <th></th>
-              <th>Cold Pressure</th>
-              <th>Cold Temperature</th>
-              <th>Hot Pressure</th>
-              <th>Hot Temperature</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { key: 'frontRight', label: 'Front Right' },
-              { key: 'frontLeft', label: 'Front Left' },
-              { key: 'rearRight', label: 'Rear Right' },
-              { key: 'rearLeft', label: 'Rear Left' },
-            ].map(({ key, label }) => {
-              const tire =
-                sessionMeta.tires[key as keyof typeof sessionMeta.tires]
-
-              return (
-                <tr key={key}>
-                  <td>
-                    <strong>{label}</strong>
-                  </td>
-
-                  <td>
-                    <input
-                      type="number"
-                      value={tire.coldP}
-                      onChange={(e) =>
-                        setSessionMeta({
-                          ...sessionMeta,
-                          tires: {
-                            ...sessionMeta.tires,
-                            [key]: { ...tire, coldP: e.target.value },
-                          },
-                        })
-                      }
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        outline: 'none',
-                        background: 'transparent',
-                        textAlign: 'center',
-                      }}
-                    />
-                  </td>
-
-                  <td>
-                    <input
-                      type="number"
-                      value={tire.coldT}
-                      onChange={(e) =>
-                        setSessionMeta({
-                          ...sessionMeta,
-                          tires: {
-                            ...sessionMeta.tires,
-                            [key]: { ...tire, coldT: e.target.value },
-                          },
-                        })
-                      }
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        outline: 'none',
-                        background: 'transparent',
-                        textAlign: 'center',
-                      }}
-                    />
-                  </td>
-
-                  <td>
-                    <input
-                      type="number"
-                      value={tire.hotP}
-                      onChange={(e) =>
-                        setSessionMeta({
-                          ...sessionMeta,
-                          tires: {
-                            ...sessionMeta.tires,
-                            [key]: { ...tire, hotP: e.target.value },
-                          },
-                        })
-                      }
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        outline: 'none',
-                        background: 'transparent',
-                        textAlign: 'center',
-                      }}
-                    />
-                  </td>
-
-                  <td>
-                    <input
-                      type="number"
-                      value={tire.hotT}
-                      onChange={(e) =>
-                        setSessionMeta({
-                          ...sessionMeta,
-                          tires: {
-                            ...sessionMeta.tires,
-                            [key]: { ...tire, hotT: e.target.value },
-                          },
-                        })
-                      }
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        outline: 'none',
-                        background: 'transparent',
-                        textAlign: 'center',
-                      }}
-                    />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-
         <h2 style={{ marginTop: 32 }}>State of Charge (SOC)</h2>
 
         <table
@@ -945,7 +796,6 @@ export default function App() {
 
         {/* Drivers */}
         {drivers.map((driver) => {
-
           const completedLaps = driver.laps.filter((lap) => !lap.isLive)
 
           const best = getBestTime(completedLaps)
@@ -1054,12 +904,44 @@ export default function App() {
                   <br />
                   <select
                     value={driver.vehicle}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const vehicle = e.target.value
+                      const isCar =
+                        vehicle === 'Vehicle 4' || vehicle === 'Vehicle 5'
+
                       updateDriver(driver.id, {
                         ...driver,
-                        vehicle: e.target.value,
+                        vehicle,
+                        tires: isCar
+                          ? (driver.tires ?? {
+                              frontRight: {
+                                coldP: '',
+                                coldT: '',
+                                hotP: '',
+                                hotT: '',
+                              },
+                              frontLeft: {
+                                coldP: '',
+                                coldT: '',
+                                hotP: '',
+                                hotT: '',
+                              },
+                              rearRight: {
+                                coldP: '',
+                                coldT: '',
+                                hotP: '',
+                                hotT: '',
+                              },
+                              rearLeft: {
+                                coldP: '',
+                                coldT: '',
+                                hotP: '',
+                                hotT: '',
+                              },
+                            })
+                          : undefined,
                       })
-                    }
+                    }}
                     style={{ height: 23 }}
                   >
                     <option value="">Select Vehicle</option>
@@ -1109,8 +991,6 @@ export default function App() {
                   <button onClick={() => startTimer(driver)}>Start</button>
                 ) : (
                   <>
-
-
                     <button onClick={() => recordLap(driver)}>Lap</button>
 
                     <button
@@ -1122,6 +1002,74 @@ export default function App() {
                   </>
                 )}
               </div>
+              {driver.tires && (
+                <div style={{ marginTop: 16 }}>
+                  <h3>Tire Data - {driver.name}</h3>
+
+                  <table
+                    border={1}
+                    cellPadding={4}
+                    style={{ width: '100%', borderCollapse: 'collapse' }}
+                  >
+                    <thead>
+                      <tr>
+                        <th></th>
+                        <th>Cold Pressure</th>
+                        <th>Cold Temp</th>
+                        <th>Hot Pressure</th>
+                        <th>Hot Temp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { key: 'frontRight', label: 'Front Right' },
+                        { key: 'frontLeft', label: 'Front Left' },
+                        { key: 'rearRight', label: 'Rear Right' },
+                        { key: 'rearLeft', label: 'Rear Left' },
+                      ].map(({ key, label }) => {
+                        const tire =
+                          driver.tires![key as keyof typeof driver.tires]
+
+                        return (
+                          <tr key={key}>
+                            <td>
+                              <strong>{label}</strong>
+                            </td>
+
+                            {(['coldP', 'coldT', 'hotP', 'hotT'] as const).map(
+                              (field) => (
+                                <td key={field}>
+                                  <input
+                                    type="text"
+                                    value={tire[field]}
+                                    onChange={(e) =>
+                                      updateDriver(driver.id, {
+                                        ...driver,
+                                        tires: {
+                                          ...driver.tires!,
+                                          [key]: {
+                                            ...tire,
+                                            [field]: e.target.value,
+                                          },
+                                        },
+                                      })
+                                    }
+                                    style={{
+                                      width: '100%',
+                                      border: 'none',
+                                      textAlign: 'center',
+                                    }}
+                                  />
+                                </td>
+                              )
+                            )}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )
         })}
