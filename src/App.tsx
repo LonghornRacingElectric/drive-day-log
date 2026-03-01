@@ -313,6 +313,8 @@ export default function App() {
   const startRef = useRef<number>(0)
 
   function startTimer(driver: Driver) {
+    startRef.current = Date.now()
+  
     const liveLap: Lap = {
       id: crypto.randomUUID(),
       time1: 0,
@@ -335,23 +337,22 @@ export default function App() {
         drivers.map((d) => {
           if (d.id !== driver.id) return d
   
-          const updatedLaps = d.laps.map((lap) =>
-            lap.isLive
-              ? { ...lap, time1: (Date.now() - startRef.current) / 1000 }
-              : lap
-          )
-  
-          return { ...d, laps: updatedLaps }
+          return {
+            ...d,
+            laps: d.laps.map((lap) =>
+              lap.isLive
+                ? { ...lap, time1: (Date.now() - startRef.current) / 1000 }
+                : lap
+            ),
+          }
         })
       )
     }, 10)
   
-    startRef.current = Date.now()
-  
     setActiveTimers((prev) => ({
       ...prev,
       [driver.id]: {
-        startTime: Date.now(),
+        startTime: startRef.current,
         elapsed: 0,
         intervalId,
       },
@@ -359,7 +360,8 @@ export default function App() {
   }
 
   function recordLap(driver: Driver) {
-    startRef.current = Date.now()
+    const newStart = Date.now()
+    startRef.current = newStart
   
     setDrivers((drivers) =>
       drivers.map((d) => {
@@ -394,6 +396,7 @@ export default function App() {
       clearInterval(timer.intervalId)
     }
   
+    // finalize live lap
     setDrivers((drivers) =>
       drivers.map((d) =>
         d.id === driverId
@@ -406,6 +409,12 @@ export default function App() {
           : d
       )
     )
+  
+    setActiveTimers((prev) => {
+      const updated = { ...prev }
+      delete updated[driverId]
+      return updated
+    })
   }
 
   function formatTime(ms: number) {
