@@ -150,28 +150,6 @@ export default function App() {
     setNewDriverName('')
   }
 
-  function addLap(driverId: string) {
-    setDrivers((drivers) =>
-      drivers.map((d) =>
-        d.id === driverId
-          ? {
-              ...d,
-              laps: [
-                ...d.laps,
-                {
-                  id: crypto.randomUUID(),
-                  time1: null,
-                  time2: null,
-                  cones: 0,
-                  offTrack: 0,
-                },
-              ],
-            }
-          : d
-      )
-    )
-  }
-
   function updateLap(driverId: string, updatedLap: Lap) {
     setDrivers((drivers) =>
       drivers.map((driver) =>
@@ -399,11 +377,6 @@ export default function App() {
       delete updated[driverId]
       return updated
     })
-  }
-
-  function formatTime(ms: number) {
-    const totalSeconds = ms / 1000
-    return totalSeconds.toFixed(2)
   }
 
   return (
