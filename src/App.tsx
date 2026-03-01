@@ -945,8 +945,11 @@ export default function App() {
 
         {/* Drivers */}
         {drivers.map((driver) => {
-          const best = getBestTime(driver.laps)
-          const avg = getAverageTime(driver.laps)
+
+          const completedLaps = driver.laps.filter((lap) => !lap.isLive)
+
+          const best = getBestTime(completedLaps)
+          const avg = getAverageTime(completedLaps)
 
           return (
             <div key={driver.id} style={{ marginTop: 24 }}>
