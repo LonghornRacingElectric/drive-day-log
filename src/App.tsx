@@ -652,7 +652,6 @@ export default function App() {
 
                 <td>
                   <input
-                    type="number"
                     value={row.finalSOC}
                     onChange={(e) =>
                       updateSOC({ ...row, finalSOC: e.target.value })
@@ -669,7 +668,6 @@ export default function App() {
 
                 <td>
                   <input
-                    type="number"
                     value={row.initialVolts}
                     onChange={(e) =>
                       updateSOC({ ...row, initialVolts: e.target.value })
@@ -686,7 +684,6 @@ export default function App() {
 
                 <td>
                   <input
-                    type="number"
                     value={row.finalVolts}
                     onChange={(e) =>
                       updateSOC({ ...row, finalVolts: e.target.value })
