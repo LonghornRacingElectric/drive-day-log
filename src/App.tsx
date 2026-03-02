@@ -12,12 +12,7 @@ import type { Lap } from './calculations'
 import LapTable from './components/LapTable'
 
 // Internal types
-import type {
-  Driver,
-  SOCData,
-  SessionMetadata,
-} from './types/driveDay'
-
+import type { Driver, SOCData, SessionMetadata } from './types/driveDay'
 
 export default function App() {
   const [drivers, setDrivers] = useState<Driver[]>(() => {
@@ -761,7 +756,10 @@ export default function App() {
                   />
                 ) : (
                   <>
-                    <span>{driver.name}</span>
+                    <span>
+                      {driver.name}
+                      {driver.vehicle ? ` - ${driver.vehicle}` : ''}
+                    </span>
 
                     <button
                       onClick={() => {
@@ -840,7 +838,7 @@ export default function App() {
                     onChange={(e) => {
                       const vehicle = e.target.value
                       const isCar =
-                        vehicle === 'Vehicle 4' || vehicle === 'Vehicle 5'
+                        vehicle === 'Angelique' || vehicle === 'Orion'
 
                       updateDriver(driver.id, {
                         ...driver,
@@ -878,11 +876,11 @@ export default function App() {
                     style={{ height: 23 }}
                   >
                     <option value="">Select Vehicle</option>
-                    <option value="Vehicle 1">KA 100</option>
-                    <option value="Vehicle 2">Rotax</option>
-                    <option value="Vehicle 3">Shifter</option>
-                    <option value="Vehicle 4">Angelique</option>
-                    <option value="Vehicle 5">Orion</option>
+                    <option value="KA 100">KA 100</option>
+                    <option value="Rotax">Rotax</option>
+                    <option value="Shifter">Shifter</option>
+                    <option value="Angelique">Angelique</option>
+                    <option value="Orion">Orion</option>
                   </select>
                 </div>
                 <div style={{ flex: 1, minWidth: 200 }}>
