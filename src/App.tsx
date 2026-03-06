@@ -847,24 +847,28 @@ export default function App() {
                                 coldT: '',
                                 hotP: '',
                                 hotT: '',
+                                depth: '',
                               },
                               frontLeft: {
                                 coldP: '',
                                 coldT: '',
                                 hotP: '',
                                 hotT: '',
+                                depth: '',
                               },
                               rearRight: {
                                 coldP: '',
                                 coldT: '',
                                 hotP: '',
                                 hotT: '',
+                                depth: '',
                               },
                               rearLeft: {
                                 coldP: '',
                                 coldT: '',
                                 hotP: '',
                                 hotT: '',
+                                depth: '',
                               },
                             })
                           : undefined,
@@ -942,10 +946,11 @@ export default function App() {
                     <thead>
                       <tr>
                         <th></th>
-                        <th>Cold Pressure</th>
-                        <th>Cold Temp</th>
-                        <th>Hot Pressure</th>
-                        <th>Hot Temp</th>
+                        <th>Cold Pressure (psi)</th>
+                        <th>Cold Temp (ºC)</th>
+                        <th>Hot Pressure (psi)</th>
+                        <th>Hot Temp (ºC)</th>
+                        <th>Tire Depth (in)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -964,7 +969,7 @@ export default function App() {
                               <strong>{label}</strong>
                             </td>
 
-                            {(['coldP', 'coldT', 'hotP', 'hotT'] as const).map(
+                            {(['coldP', 'coldT', 'hotP', 'hotT', 'depth'] as const).map(
                               (field) => (
                                 <td key={field}>
                                   <input

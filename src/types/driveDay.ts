@@ -5,6 +5,7 @@ export type TireData = {
     coldT: string
     hotP: string
     hotT: string
+    depth: string
   }
 
 export type Driver = {
