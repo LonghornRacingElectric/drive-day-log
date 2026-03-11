@@ -5,11 +5,18 @@ import { Trash2 } from 'lucide-react'
 type Props = {
   lap: Lap
   index: number
+  activeElapsed: number
   onChange: (updated: Lap) => void
   onDelete: () => void
 }
 
-export default function LapRow({ lap, index, onChange, onDelete }: Props) {
+export default function LapRow({
+  lap,
+  index,
+  activeElapsed,
+  onChange,
+  onDelete,
+}: Props) {
   const [isHovering, setIsHovering] = useState(false)
 
   function update<K extends keyof Lap>(key: K, value: Lap[K]) {
@@ -31,10 +38,36 @@ export default function LapRow({ lap, index, onChange, onDelete }: Props) {
           width: 80,
         }}
       >
-        {isHovering ? (
-          <Trash2 size={16} color="red" />
+        {isHovering ? <Trash2 size={16} color="red" /> : `Lap ${index + 1}`}
+      </td>
+
+      <td>
+        {lap.isLive ? (
+          <span
+            style={{
+              fontSize: '14px',
+              fontFamily: '"Times New Roman", Times, serif',
+            }}
+          >
+            {activeElapsed.toFixed(2)}
+          </span>
         ) : (
-          `Lap ${index + 1}`
+          <input
+            type="number"
+            inputMode="decimal"
+            value={lap.time1 ?? ''}
+            onChange={(e) =>
+              update(
+                'time1',
+                e.target.value === '' ? null : Number(e.target.value)
+              )
+            }
+            style={{
+              fontSize: '14px',
+              boxSizing: 'border-box',
+              fontFamily: '"Times New Roman", Times, serif',
+            }}
+          />
         )}
       </td>
 
@@ -42,28 +75,15 @@ export default function LapRow({ lap, index, onChange, onDelete }: Props) {
         <input
           type="number"
           inputMode="decimal"
-          value={lap.time1 ?? ''}
-          onChange={e =>
-            update('time1', e.target.value === '' ? null : Number(e.target.value))
-          }
-          style={{
-            fontSize: '14px',       
-            boxSizing: 'border-box',
-            fontFamily: '"Times New Roman", Times, serif',
-          }}
-        />
-      </td>
-
-      <td>
-        <input
-          type="number"
-          inputMode="decimal"
           value={lap.time2 ?? ''}
-          onChange={e =>
-            update('time2', e.target.value === '' ? null : Number(e.target.value))
+          onChange={(e) =>
+            update(
+              'time2',
+              e.target.value === '' ? null : Number(e.target.value)
+            )
           }
           style={{
-            fontSize: '14px',       
+            fontSize: '14px',
             boxSizing: 'border-box',
             fontFamily: '"Times New Roman", Times, serif',
           }}
@@ -71,13 +91,19 @@ export default function LapRow({ lap, index, onChange, onDelete }: Props) {
       </td>
 
       <td>
-        <button onClick={() => update('cones', Math.max(0, lap.cones - 1))}>−</button>
+        <button onClick={() => update('cones', Math.max(0, lap.cones - 1))}>
+          −
+        </button>
         <span style={{ margin: '0 6px' }}>{lap.cones}</span>
         <button onClick={() => update('cones', lap.cones + 1)}>+</button>
       </td>
 
       <td>
-        <button onClick={() => update('offTrack', Math.max(0, lap.offTrack - 1))}>−</button>
+        <button
+          onClick={() => update('offTrack', Math.max(0, lap.offTrack - 1))}
+        >
+          −
+        </button>
         <span style={{ margin: '0 6px' }}>{lap.offTrack}</span>
         <button onClick={() => update('offTrack', lap.offTrack + 1)}>+</button>
       </td>

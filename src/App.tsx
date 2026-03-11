@@ -68,6 +68,8 @@ export default function App() {
   const [editingName, setEditingName] = useState('')
   const [trackImage, setTrackImage] = useState<string | null>(null)
 
+  const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
+
   useEffect(() => {
     localStorage.setItem('driveDayDrivers', JSON.stringify(drivers))
   }, [drivers])
@@ -85,6 +87,16 @@ export default function App() {
       localStorage.setItem('trackImage', trackImage)
     }
   }, [trackImage])
+
+  useEffect(() => {
+    drivers.forEach((driver) => {
+      const el = textAreaRefs.current[driver.id]
+      if (el) {
+        el.style.height = 'auto'
+        el.style.height = el.scrollHeight + 'px'
+      }
+    })
+  }, [drivers])
 
   function addDriver() {
     if (!newDriverName.trim()) return
@@ -250,21 +262,14 @@ export default function App() {
     )
 
     const intervalId = window.setInterval(() => {
-      setDrivers((drivers) =>
-        drivers.map((d) => {
-          if (d.id !== driver.id) return d
-
-          return {
-            ...d,
-            laps: d.laps.map((lap) =>
-              lap.isLive
-                ? { ...lap, time1: (Date.now() - startRef.current) / 1000 }
-                : lap
-            ),
-          }
-        })
-      )
-    }, 10)
+      setActiveTimers((prev) => ({
+        ...prev,
+        [driver.id]: {
+          ...prev[driver.id],
+          elapsed: (Date.now() - startRef.current) / 1000,
+        },
+      }))
+    }, 50)
 
     setActiveTimers((prev) => ({
       ...prev,
@@ -277,6 +282,7 @@ export default function App() {
   }
 
   function recordLap(driver: Driver) {
+    const elapsed = activeTimers[driver.id]?.elapsed ?? 0
     const newStart = Date.now()
     startRef.current = newStart
 
@@ -285,7 +291,7 @@ export default function App() {
         if (d.id !== driver.id) return d
 
         const finalized = d.laps.map((lap) =>
-          lap.isLive ? { ...lap, isLive: false } : lap
+          lap.isLive ? { ...lap, isLive: false, time1: elapsed } : lap
         )
 
         const newLiveLap: Lap = {
@@ -303,6 +309,16 @@ export default function App() {
         }
       })
     )
+
+    // reset elapsed for next lap
+    setActiveTimers((prev) => ({
+      ...prev,
+      [driver.id]: {
+        ...prev[driver.id],
+        startTime: newStart,
+        elapsed: 0,
+      },
+    }))
   }
 
   function stopTimer(driverId: string) {
@@ -320,7 +336,13 @@ export default function App() {
           ? {
               ...d,
               laps: d.laps.map((lap) =>
-                lap.isLive ? { ...lap, isLive: false } : lap
+                lap.isLive
+                  ? {
+                      ...lap,
+                      isLive: false,
+                      time1: activeTimers[driverId]?.elapsed ?? lap.time1,
+                    }
+                  : lap
               ),
             }
           : d
@@ -884,12 +906,13 @@ export default function App() {
                     <option value="Orion">Orion</option>
                   </select>
                 </div>
-                <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ flex: 1, minWidth: 500 }}>
                   <label>Comments/Notes</label>
                   <br />
-                  <input
-                    type="text"
-                    placeholder="Enter driver feedback, setup changes, etc."
+                  <textarea
+                    ref={(el) => {
+                      textAreaRefs.current[driver.id] = el
+                    }}
                     value={driver.comments}
                     onChange={(e) =>
                       updateDriver(driver.id, {
@@ -898,8 +921,13 @@ export default function App() {
                       })
                     }
                     style={{
-                      width: '285px',
-                      height: '20px',
+                      width: '100%',
+                      minHeight: '40px',
+                      resize: 'none',
+                      overflow: 'hidden',
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      padding: '4px',
                     }}
                   />
                 </div>
@@ -913,6 +941,7 @@ export default function App() {
               <LapTable
                 laps={driver.laps}
                 bestTime={best}
+                activeElapsed={activeTimers[driver.id]?.elapsed ?? 0}
                 onUpdateLap={(lap) => updateLap(driver.id, lap)}
                 onDeleteLap={(lapId, index) =>
                   deleteLap(driver.id, lapId, index)
@@ -969,33 +998,39 @@ export default function App() {
                               <strong>{label}</strong>
                             </td>
 
-                            {(['coldP', 'coldT', 'hotP', 'hotT', 'depth'] as const).map(
-                              (field) => (
-                                <td key={field}>
-                                  <input
-                                    type="text"
-                                    value={tire[field]}
-                                    onChange={(e) =>
-                                      updateDriver(driver.id, {
-                                        ...driver,
-                                        tires: {
-                                          ...driver.tires!,
-                                          [key]: {
-                                            ...tire,
-                                            [field]: e.target.value,
-                                          },
+                            {(
+                              [
+                                'coldP',
+                                'coldT',
+                                'hotP',
+                                'hotT',
+                                'depth',
+                              ] as const
+                            ).map((field) => (
+                              <td key={field}>
+                                <input
+                                  type="text"
+                                  value={tire[field]}
+                                  onChange={(e) =>
+                                    updateDriver(driver.id, {
+                                      ...driver,
+                                      tires: {
+                                        ...driver.tires!,
+                                        [key]: {
+                                          ...tire,
+                                          [field]: e.target.value,
                                         },
-                                      })
-                                    }
-                                    style={{
-                                      width: '100%',
-                                      border: 'none',
-                                      textAlign: 'center',
-                                    }}
-                                  />
-                                </td>
-                              )
-                            )}
+                                      },
+                                    })
+                                  }
+                                  style={{
+                                    width: '100%',
+                                    border: 'none',
+                                    textAlign: 'center',
+                                  }}
+                                />
+                              </td>
+                            ))}
                           </tr>
                         )
                       })}

@@ -5,6 +5,7 @@ import LapRow from './LapRow'
 type Props = {
   laps: Lap[]
   bestTime: number | null
+  activeElapsed: number
   onUpdateLap: (lap: Lap) => void
   onDeleteLap: (lapId: string, index: number) => void
 }
@@ -12,6 +13,7 @@ type Props = {
 export default function LapTable({
   laps,
   bestTime,
+  activeElapsed,
   onUpdateLap,
   onDeleteLap,
 }: Props) {
@@ -41,6 +43,7 @@ export default function LapTable({
               <LapRow
                 lap={lap}
                 index={index}
+                activeElapsed={activeElapsed}
                 onChange={onUpdateLap}
                 onDelete={() => onDeleteLap(lap.id, index)}
               />
