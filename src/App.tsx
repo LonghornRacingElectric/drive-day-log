@@ -366,7 +366,7 @@ export default function App() {
       }}
     >
       <div style={{ flex: 3 }}>
-        <h1>Longhorn Racing Drive Day Log</h1>
+        <h1>Longhorn Racing Drive Day Log LEBRON</h1>
         <h2
           style={{
             marginTop: 0,
