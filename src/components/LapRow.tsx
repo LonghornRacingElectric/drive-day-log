@@ -26,31 +26,40 @@ export default function LapRow({
   return (
     <>
       <td
+        className="lap-num-cell"
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onClick={() => {
           if (isHovering) onDelete()
         }}
-        style={{
-          cursor: 'pointer',
-          textAlign: 'center',
-          fontWeight: 500,
-          width: 80,
-        }}
+        title="Click to delete lap"
       >
-        {isHovering ? <Trash2 size={16} color="red" /> : `Lap ${index + 1}`}
+        {isHovering ? (
+          <Trash2 size={14} color="var(--red)" />
+        ) : (
+          <>
+            {lap.isLive && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--green)',
+                  marginRight: 4,
+                  verticalAlign: 'middle',
+                  animation: 'badge-pulse 1.2s ease-in-out infinite',
+                }}
+              />
+            )}
+            {index + 1}
+          </>
+        )}
       </td>
 
       <td>
         {lap.isLive ? (
-          <span
-            style={{
-              fontSize: '14px',
-              fontFamily: '"Times New Roman", Times, serif',
-            }}
-          >
-            {activeElapsed.toFixed(2)}
-          </span>
+          <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
         ) : (
           <input
             type="number"
@@ -62,11 +71,7 @@ export default function LapRow({
                 e.target.value === '' ? null : Number(e.target.value)
               )
             }
-            style={{
-              fontSize: '14px',
-              boxSizing: 'border-box',
-              fontFamily: '"Times New Roman", Times, serif',
-            }}
+            className="lap-time-input"
           />
         )}
       </td>
@@ -82,30 +87,44 @@ export default function LapRow({
               e.target.value === '' ? null : Number(e.target.value)
             )
           }
-          style={{
-            fontSize: '14px',
-            boxSizing: 'border-box',
-            fontFamily: '"Times New Roman", Times, serif',
-          }}
+          className="lap-time-input"
         />
       </td>
 
       <td>
-        <button onClick={() => update('cones', Math.max(0, lap.cones - 1))}>
-          −
-        </button>
-        <span style={{ margin: '0 6px' }}>{lap.cones}</span>
-        <button onClick={() => update('cones', lap.cones + 1)}>+</button>
+        <div className="counter-group">
+          <button
+            className="counter-btn"
+            onClick={() => update('cones', Math.max(0, lap.cones - 1))}
+          >
+            −
+          </button>
+          <span className="counter-val">{lap.cones}</span>
+          <button
+            className="counter-btn"
+            onClick={() => update('cones', lap.cones + 1)}
+          >
+            +
+          </button>
+        </div>
       </td>
 
       <td>
-        <button
-          onClick={() => update('offTrack', Math.max(0, lap.offTrack - 1))}
-        >
-          −
-        </button>
-        <span style={{ margin: '0 6px' }}>{lap.offTrack}</span>
-        <button onClick={() => update('offTrack', lap.offTrack + 1)}>+</button>
+        <div className="counter-group">
+          <button
+            className="counter-btn"
+            onClick={() => update('offTrack', Math.max(0, lap.offTrack - 1))}
+          >
+            −
+          </button>
+          <span className="counter-val">{lap.offTrack}</span>
+          <button
+            className="counter-btn"
+            onClick={() => update('offTrack', lap.offTrack + 1)}
+          >
+            +
+          </button>
+        </div>
       </td>
     </>
   )

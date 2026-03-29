@@ -7,7 +7,21 @@ and this project follows Semantic Versioning.
 
 ---
 
-## [1.0.0] - 2026-03-29
+## [1.1.0] - 2026-03-29
+
+### Added
+- Confirmation modals for:
+  - Reset session
+  - Delete lap
+  - Delete driver
+
+### Changed
+- Major frontend UI redesign
+- Improved driver and lap interaction UX
+- Improved usability during live drive day usage
+
+
+## [1.0.0] - 2026-03-28
 
 ### Added
 - Initial release of Drive Day Log

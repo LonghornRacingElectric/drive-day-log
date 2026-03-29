@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 // Third party
-import { Trash2, Pencil } from 'lucide-react'
+import { Trash2, Pencil, Plus, MapPin, RotateCcw, Upload, Flag, Timer, Zap } from 'lucide-react'
 
 // Internal utilities
 import { getBestTime, getAverageTime } from './calculations'
@@ -10,6 +10,7 @@ import type { Lap } from './calculations'
 
 // Internal components
 import LapTable from './components/LapTable'
+import ConfirmModal from './components/ConfirmModal'
 
 // Internal types
 import type { Driver, SOCData, SessionMetadata } from './types/driveDay'
@@ -51,7 +52,6 @@ export default function App() {
             trackTemp: '',
             wetTrack: false,
           },
-
           stateOfCharge: [
             {
               id: crypto.randomUUID(),
@@ -67,6 +67,34 @@ export default function App() {
   const [editingDriverId, setEditingDriverId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [trackImage, setTrackImage] = useState<string | null>(null)
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean
+    title: string
+    message: string
+    confirmLabel: string
+    onConfirm: () => void
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Delete',
+    onConfirm: () => {},
+  })
+
+  function openConfirm(opts: {
+    title: string
+    message: string
+    confirmLabel?: string
+    onConfirm: () => void
+  }) {
+    setConfirmModal({ open: true, confirmLabel: 'Delete', ...opts })
+  }
+
+  function closeConfirm() {
+    setConfirmModal((m) => ({ ...m, open: false }))
+  }
 
   const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
 
@@ -133,25 +161,31 @@ export default function App() {
   }
 
   function deleteLap(driverId: string, lapId: string, index: number) {
-    const ok = window.confirm(`Delete Lap ${index + 1}? This cannot be undone.`)
-    if (!ok) return
-
-    setDrivers((drivers) =>
-      drivers.map((d) =>
-        d.id === driverId
-          ? { ...d, laps: d.laps.filter((l) => l.id !== lapId) }
-          : d
-      )
-    )
+    openConfirm({
+      title: `Delete Lap ${index + 1}?`,
+      message: 'This lap will be permanently removed. This cannot be undone.',
+      confirmLabel: 'Delete Lap',
+      onConfirm: () => {
+        setDrivers((drivers) =>
+          drivers.map((d) =>
+            d.id === driverId
+              ? { ...d, laps: d.laps.filter((l) => l.id !== lapId) }
+              : d
+          )
+        )
+      },
+    })
   }
 
   function deleteDriver(driverId: string, driverName: string) {
-    const ok = window.confirm(
-      `Delete ${driverName} and all of their laps? This cannot be undone.`
-    )
-    if (!ok) return
-
-    setDrivers((drivers) => drivers.filter((d) => d.id !== driverId))
+    openConfirm({
+      title: `Delete ${driverName}?`,
+      message: 'All laps and data for this driver will be permanently removed. This cannot be undone.',
+      confirmLabel: 'Delete Driver',
+      onConfirm: () => {
+        setDrivers((drivers) => drivers.filter((d) => d.id !== driverId))
+      },
+    })
   }
 
   function updateDriver(driverId: string, updated: Driver) {
@@ -167,9 +201,7 @@ export default function App() {
       )
 
       const lastRow = updatedRows[updatedRows.length - 1]
-
       const isLast = updated.id === lastRow.id
-
       const isComplete =
         updated.initialSOC &&
         updated.finalSOC &&
@@ -200,10 +232,11 @@ export default function App() {
   }
 
   function resetSession() {
-    const ok = window.confirm(
-      'Reset the entire drive day log? This will remove all drivers, laps, and info. This cannot be undone.'
-    )
-    if (!ok) return
+    openConfirm({
+      title: 'Reset Session?',
+      message: 'This will permanently remove all drivers, laps, and session info. This cannot be undone.',
+      confirmLabel: 'Reset Everything',
+      onConfirm: () => {
 
     setDrivers([])
     setSessionMeta({
@@ -222,7 +255,6 @@ export default function App() {
         trackTemp: '',
         wetTrack: false,
       },
-
       stateOfCharge: [
         {
           id: crypto.randomUUID(),
@@ -234,11 +266,12 @@ export default function App() {
       ],
     })
 
-    setTrackImage(null)
-    localStorage.removeItem('trackImage')
-
-    localStorage.removeItem('driveDayDrivers')
-    localStorage.removeItem('driveDayMeta')
+      setTrackImage(null)
+      localStorage.removeItem('trackImage')
+      localStorage.removeItem('driveDayDrivers')
+      localStorage.removeItem('driveDayMeta')
+      },
+    })
   }
 
   const startRef = useRef<number>(0)
@@ -310,7 +343,6 @@ export default function App() {
       })
     )
 
-    // reset elapsed for next lap
     setActiveTimers((prev) => ({
       ...prev,
       [driver.id]: {
@@ -329,7 +361,6 @@ export default function App() {
       clearInterval(timer.intervalId)
     }
 
-    // finalize live lap
     setDrivers((drivers) =>
       drivers.map((d) =>
         d.id === driverId
@@ -356,741 +387,713 @@ export default function App() {
     })
   }
 
+  // Helper: get driver initials
+  function getInitials(name: string) {
+    return name
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const isTimerActive = (driverId: string) =>
+    !!activeTimers[driverId]?.startTime
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 24,
-        padding: 24,
-        alignItems: 'flex-start',
-      }}
-    >
-      <div style={{ flex: 3 }}>
-        <h1>Longhorn Racing - Drive Day Log</h1>
-        <h2
-          style={{
-            marginTop: 0,
-            marginBottom: 12,
-          }}
-        >
-          Session Goals
-        </h2>
+    <>
+      {/* ── Confirm Modal ── */}
+      <ConfirmModal
+        open={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        onConfirm={() => {
+          confirmModal.onConfirm()
+          closeConfirm()
+        }}
+        onCancel={closeConfirm}
+      />
 
-        <input
-          type="text"
-          value={sessionMeta.sessionGoals}
-          onChange={(e) =>
-            setSessionMeta({
-              ...sessionMeta,
-              sessionGoals: e.target.value,
-            })
-          }
-          placeholder="Enter session objectives"
-          style={{
-            width: '300px',
-            fontSize: 16,
-            fontFamily: '"Times New Roman", Times, serif',
-          }}
-        />
-        <h2>Session Info</h2>
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              marginBottom: 12,
-              alignItems: 'flex-end',
-            }}
-          >
-            <div>
-              <label>Date</label>
-              <br />
-              <input
-                type="date"
-                value={sessionMeta.date}
-                onChange={(e) =>
-                  setSessionMeta({ ...sessionMeta, date: e.target.value })
-                }
-              />
-            </div>
-
-            <div>
-              <label>Event</label>
-              <br />
-              <select
-                value={sessionMeta.event}
-                onChange={(e) =>
-                  setSessionMeta({ ...sessionMeta, event: e.target.value })
-                }
-              >
-                <option value="">Select</option>
-                <option value="Skidpad">Skidpad</option>
-                <option value="Autocross">Autocross</option>
-                <option value="Endurance">Endurance</option>
-                <option value="Kart Driver Training">
-                  Kart Driver Training
-                </option>
-              </select>
-            </div>
-
-            <div style={{ flex: 1, maxWidth: 200 }}>
-              <label>Weather</label>
-              <br />
-              <input
-                type="text"
-                placeholder="Enter weather details"
-                value={sessionMeta.weather}
-                onChange={(e) =>
-                  setSessionMeta({ ...sessionMeta, weather: e.target.value })
-                }
-                style={{ width: '100%' }}
-              />
-            </div>
-          </div>
-
-          {/* Row 2: Start / End */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              marginBottom: 42,
-              alignItems: 'flex-end',
-            }}
-          >
-            <div>
-              <label>Drive Day Start</label>
-              <br />
-              <input
-                type="time"
-                step={60}
-                value={sessionMeta.startTime}
-                onChange={(e) =>
-                  setSessionMeta({ ...sessionMeta, startTime: e.target.value })
-                }
-              />
-            </div>
-
-            <div>
-              <label>Drive Day End</label>
-              <br />
-              <input
-                type="time"
-                step={60}
-                value={sessionMeta.endTime}
-                onChange={(e) =>
-                  setSessionMeta({ ...sessionMeta, endTime: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label>Power Limit</label>
-              <br />
-              <input
-                type="text"
-                placeholder="ex. 80 kW"
-                value={sessionMeta.powerLimit}
-                onChange={(e) =>
-                  setSessionMeta({ ...sessionMeta, powerLimit: e.target.value })
-                }
-                style={{
-                  height: '18px',
-                }}
-              />
-            </div>
-            <div>
-              <label>Total Distance (mi)</label>
-              <br />
-              <input
-                type="number"
-                placeholder="ex. 1.5 mi"
-                value={sessionMeta.totalDistance}
-                onChange={(e) =>
-                  setSessionMeta({
-                    ...sessionMeta,
-                    totalDistance: e.target.value,
-                  })
-                }
-                style={{
-                  height: '18px',
-                }}
-              />
-            </div>
-          </div>
-        </div>
-        <h2 style={{ marginTop: 32 }}>Track Conditions</h2>
-
-        <div
-          style={{
-            display: 'flex',
-            gap: 20,
-            flexWrap: 'wrap',
-            marginBottom: 32,
-          }}
-        >
-          <div>
-            <label>Wind (mph)</label>
-            <br />
-            <input
-              type="number"
-              value={sessionMeta.trackConditions.wind}
-              onChange={(e) =>
-                setSessionMeta({
-                  ...sessionMeta,
-                  trackConditions: {
-                    ...sessionMeta.trackConditions,
-                    wind: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
-
-          <div>
-            <label>Humidity (%)</label>
-            <br />
-            <input
-              type="number"
-              value={sessionMeta.trackConditions.humidity}
-              onChange={(e) =>
-                setSessionMeta({
-                  ...sessionMeta,
-                  trackConditions: {
-                    ...sessionMeta.trackConditions,
-                    humidity: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
-
-          <div>
-            <label>Ambient Temp (°F)</label>
-            <br />
-            <input
-              type="number"
-              value={sessionMeta.trackConditions.ambientTemp}
-              onChange={(e) =>
-                setSessionMeta({
-                  ...sessionMeta,
-                  trackConditions: {
-                    ...sessionMeta.trackConditions,
-                    ambientTemp: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
-
-          <div>
-            <label>Track Temp (°F)</label>
-            <br />
-            <input
-              type="number"
-              value={sessionMeta.trackConditions.trackTemp}
-              onChange={(e) =>
-                setSessionMeta({
-                  ...sessionMeta,
-                  trackConditions: {
-                    ...sessionMeta.trackConditions,
-                    trackTemp: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
-
-          <div>
-            <label>Wet Track</label>
-            <br />
-            <select
-              value={
-                sessionMeta.trackConditions.wetTrack === true
-                  ? 'yes'
-                  : sessionMeta.trackConditions.wetTrack === false
-                    ? 'no'
-                    : ''
-              }
-              onChange={(e) =>
-                setSessionMeta({
-                  ...sessionMeta,
-                  trackConditions: {
-                    ...sessionMeta.trackConditions,
-                    wetTrack: e.target.value === 'yes',
-                  },
-                })
-              }
-              style={{
-                height: '21px',
-              }}
-            >
-              <option value="">Select</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-        </div>
-
-        <h2 style={{ marginTop: 32 }}>State of Charge (SOC)</h2>
-
-        <table
-          border={1}
-          cellPadding={4}
-          style={{
-            borderCollapse: 'collapse',
-            width: '100%',
-            marginBottom: 32,
-          }}
-        >
-          <thead>
-            <tr>
-              <th>Recharge #</th>
-              <th>Initial SOC</th>
-              <th>Final SOC</th>
-              <th>Initial Volts</th>
-              <th>Final Volts</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {sessionMeta.stateOfCharge.map((row, index) => (
-              <tr key={row.id}>
-                <td style={{ textAlign: 'center' }}>{index + 1}</td>
-
-                <td>
-                  <input
-                    value={row.initialSOC}
-                    onChange={(e) =>
-                      updateSOC({ ...row, initialSOC: e.target.value })
-                    }
-                    style={{
-                      width: '100%',
-                      border: 'none',
-                      outline: 'none',
-                      background: 'transparent',
-                      textAlign: 'center' as const,
-                    }}
-                  />
-                </td>
-
-                <td>
-                  <input
-                    value={row.finalSOC}
-                    onChange={(e) =>
-                      updateSOC({ ...row, finalSOC: e.target.value })
-                    }
-                    style={{
-                      width: '100%',
-                      border: 'none',
-                      outline: 'none',
-                      background: 'transparent',
-                      textAlign: 'center' as const,
-                    }}
-                  />
-                </td>
-
-                <td>
-                  <input
-                    value={row.initialVolts}
-                    onChange={(e) =>
-                      updateSOC({ ...row, initialVolts: e.target.value })
-                    }
-                    style={{
-                      width: '100%',
-                      border: 'none',
-                      outline: 'none',
-                      background: 'transparent',
-                      textAlign: 'center' as const,
-                    }}
-                  />
-                </td>
-
-                <td>
-                  <input
-                    value={row.finalVolts}
-                    onChange={(e) =>
-                      updateSOC({ ...row, finalVolts: e.target.value })
-                    }
-                    style={{
-                      width: '100%',
-                      border: 'none',
-                      outline: 'none',
-                      background: 'transparent',
-                      textAlign: 'center' as const,
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            marginBottom: 36,
-          }}
-        >
-          <input
-            placeholder="Enter driver name"
-            value={newDriverName}
-            onChange={(e) => setNewDriverName(e.target.value)}
+      {/* ── Header ── */}
+      <header className="app-header">
+        <div className="header-inner">
+          <div className="header-brand">
+            <img
+            src="/lhr_logo.png"
+            alt="Longhorn Racing"
+            style={{ height: 44, width: 'auto', filter: 'brightness(0) invert(1)' }}
           />
-          <button onClick={addDriver}>Add Driver</button>
-          <button onClick={resetSession}>Reset Session</button>
+            <div className="header-titles">
+              <h1>Drive Day Log</h1>
+              <div className="subtitle">Longhorn Racing Electric</div>
+            </div>
+          </div>
+
+          <div className="header-goals">
+            <span className="header-goals-label">Goals</span>
+            <input
+              type="text"
+              id="session-goals"
+              value={sessionMeta.sessionGoals}
+              onChange={(e) =>
+                setSessionMeta({ ...sessionMeta, sessionGoals: e.target.value })
+              }
+              placeholder="Enter session objectives…"
+              style={{ flex: 1 }}
+            />
+          </div>
+
+          <button
+            id="reset-session-btn"
+            className="btn btn-danger"
+            onClick={resetSession}
+          >
+            <RotateCcw size={14} />
+            Reset Session
+          </button>
         </div>
+      </header>
 
-        {/* Drivers */}
-        {drivers.map((driver) => {
-          const completedLaps = driver.laps.filter((lap) => !lap.isLive)
+      {/* ── Main layout ── */}
+      <div className="app-layout">
 
-          const best = getBestTime(completedLaps)
-          const avg = getAverageTime(completedLaps)
+        {/* ===== LEFT / MAIN PANEL ===== */}
+        <div className="main-panel">
 
-          return (
-            <div key={driver.id} style={{ marginTop: 24 }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {editingDriverId === driver.id ? (
+          {/* Session Info Card */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">
+                <Flag size={12} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-light)' }} />
+                Session Info
+              </span>
+            </div>
+
+            {/* Row 1: Date / Event / Weather */}
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 12 }}>
+              <div className="field">
+                <label className="field-label" htmlFor="session-date">Date</label>
+                <input
+                  id="session-date"
+                  type="date"
+                  value={sessionMeta.date}
+                  onChange={(e) =>
+                    setSessionMeta({ ...sessionMeta, date: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="session-event">Event</label>
+                <select
+                  id="session-event"
+                  value={sessionMeta.event}
+                  onChange={(e) =>
+                    setSessionMeta({ ...sessionMeta, event: e.target.value })
+                  }
+                >
+                  <option value="">Select</option>
+                  <option value="Skidpad">Skidpad</option>
+                  <option value="Autocross">Autocross</option>
+                  <option value="Endurance">Endurance</option>
+                  <option value="Kart Driver Training">Kart Driver Training</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="session-weather">Weather</label>
+                <input
+                  id="session-weather"
+                  type="text"
+                  placeholder="e.g. Sunny, 75°F"
+                  value={sessionMeta.weather}
+                  onChange={(e) =>
+                    setSessionMeta({ ...sessionMeta, weather: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Day Start / Day End / Power Limit / Total Distance */}
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 14 }}>
+              <div className="field">
+                <label className="field-label" htmlFor="session-start">Day Start</label>
+                <input
+                  id="session-start"
+                  type="time"
+                  step={60}
+                  value={sessionMeta.startTime}
+                  onChange={(e) =>
+                    setSessionMeta({ ...sessionMeta, startTime: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="session-end">Day End</label>
+                <input
+                  id="session-end"
+                  type="time"
+                  step={60}
+                  value={sessionMeta.endTime}
+                  onChange={(e) =>
+                    setSessionMeta({ ...sessionMeta, endTime: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="power-limit">
+                  <Zap size={10} style={{ display: 'inline', marginRight: 3, verticalAlign: 'middle' }} />
+                  Power Limit
+                </label>
+                <input
+                  id="power-limit"
+                  type="text"
+                  placeholder="e.g. 80 kW"
+                  value={sessionMeta.powerLimit}
+                  onChange={(e) =>
+                    setSessionMeta({ ...sessionMeta, powerLimit: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="total-distance">Total Distance</label>
+                <input
+                  id="total-distance"
+                  type="number"
+                  placeholder="mi"
+                  value={sessionMeta.totalDistance}
+                  onChange={(e) =>
+                    setSessionMeta({
+                      ...sessionMeta,
+                      totalDistance: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Track Conditions Card */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Track Conditions</span>
+            </div>
+
+            <div className="form-grid">
+              <div className="field">
+                <label className="field-label" htmlFor="cond-wind">Wind (mph)</label>
+                <input
+                  id="cond-wind"
+                  type="number"
+                  value={sessionMeta.trackConditions.wind}
+                  onChange={(e) =>
+                    setSessionMeta({
+                      ...sessionMeta,
+                      trackConditions: {
+                        ...sessionMeta.trackConditions,
+                        wind: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="cond-humidity">Humidity (%)</label>
+                <input
+                  id="cond-humidity"
+                  type="number"
+                  value={sessionMeta.trackConditions.humidity}
+                  onChange={(e) =>
+                    setSessionMeta({
+                      ...sessionMeta,
+                      trackConditions: {
+                        ...sessionMeta.trackConditions,
+                        humidity: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="cond-ambient">Ambient Temp (°F)</label>
+                <input
+                  id="cond-ambient"
+                  type="number"
+                  value={sessionMeta.trackConditions.ambientTemp}
+                  onChange={(e) =>
+                    setSessionMeta({
+                      ...sessionMeta,
+                      trackConditions: {
+                        ...sessionMeta.trackConditions,
+                        ambientTemp: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="cond-track-temp">Track Temp (°F)</label>
+                <input
+                  id="cond-track-temp"
+                  type="number"
+                  value={sessionMeta.trackConditions.trackTemp}
+                  onChange={(e) =>
+                    setSessionMeta({
+                      ...sessionMeta,
+                      trackConditions: {
+                        ...sessionMeta.trackConditions,
+                        trackTemp: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label">Wet Track</label>
+                <label className="wet-toggle" htmlFor="cond-wet">
                   <input
-                    value={editingName}
-                    autoFocus
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onBlur={() => {
-                      updateDriver(driver.id, {
-                        ...driver,
-                        name: editingName.trim() || driver.name,
+                    id="cond-wet"
+                    type="checkbox"
+                    checked={sessionMeta.trackConditions.wetTrack === true}
+                    onChange={(e) =>
+                      setSessionMeta({
+                        ...sessionMeta,
+                        trackConditions: {
+                          ...sessionMeta.trackConditions,
+                          wetTrack: e.target.checked,
+                        },
                       })
-                      setEditingDriverId(null)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        updateDriver(driver.id, {
-                          ...driver,
-                          name: editingName.trim() || driver.name,
-                        })
-                        setEditingDriverId(null)
-                      }
-                    }}
+                    }
                   />
-                ) : (
-                  <>
-                    <span>
-                      {driver.name}
-                      {driver.vehicle ? ` - ${driver.vehicle}` : ''}
-                    </span>
+                  <span>
+                    {sessionMeta.trackConditions.wetTrack ? 'Yes — wet' : 'No — dry'}
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
 
+          {/* State of Charge Card */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">
+                <Zap size={12} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-light)' }} />
+                State of Charge
+              </span>
+            </div>
+
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 60 }}>#</th>
+                  <th>Initial SOC</th>
+                  <th>Final SOC</th>
+                  <th>Initial V</th>
+                  <th>Final V</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessionMeta.stateOfCharge.map((row, index) => (
+                  <tr key={row.id}>
+                    <td className="row-num">{index + 1}</td>
+
+                    {(['initialSOC', 'finalSOC', 'initialVolts', 'finalVolts'] as const).map((field) => (
+                      <td key={field}>
+                        <input
+                          className="table-input"
+                          value={row[field]}
+                          onChange={(e) =>
+                            updateSOC({ ...row, [field]: e.target.value })
+                          }
+                          id={`soc-${index}-${field}`}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Add Driver Row */}
+          <div className="add-driver-row section-gap">
+            <Plus size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <input
+              id="new-driver-name"
+              type="text"
+              placeholder="Enter driver name…"
+              value={newDriverName}
+              onChange={(e) => setNewDriverName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') addDriver()
+              }}
+            />
+            <button
+              id="add-driver-btn"
+              className="btn btn-primary"
+              onClick={addDriver}
+            >
+              Add Driver
+            </button>
+          </div>
+
+          {/* ── Driver Cards ── */}
+          {drivers.map((driver) => {
+            const completedLaps = driver.laps.filter((lap) => !lap.isLive)
+            const best = getBestTime(completedLaps)
+            const avg = getAverageTime(completedLaps)
+            const timerActive = isTimerActive(driver.id)
+
+            return (
+              <div
+                key={driver.id}
+                id={`driver-${driver.id}`}
+                className="driver-card"
+              >
+                {/* Driver Header */}
+                <div className="driver-header">
+                  <div className="driver-avatar">
+                    {getInitials(driver.name)}
+                  </div>
+
+                  <div className="driver-name-area">
+                    {editingDriverId === driver.id ? (
+                      <input
+                        className="driver-name-input"
+                        value={editingName}
+                        autoFocus
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => {
+                          updateDriver(driver.id, {
+                            ...driver,
+                            name: editingName.trim() || driver.name,
+                          })
+                          setEditingDriverId(null)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            updateDriver(driver.id, {
+                              ...driver,
+                              name: editingName.trim() || driver.name,
+                            })
+                            setEditingDriverId(null)
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="driver-name">{driver.name}</div>
+                    )}
+                    {driver.vehicle && (
+                      <div className="driver-vehicle-badge">{driver.vehicle}</div>
+                    )}
+                  </div>
+
+                  {/* Stats chips */}
+                  <div className="driver-stats">
+                    <div className="stat-chip">
+                      <div className="label">Best</div>
+                      <div className={`value ${best != null ? 'best' : ''}`}>
+                        {best != null ? `${best.toFixed(2)}s` : '—'}
+                      </div>
+                    </div>
+                    <div className="stat-chip">
+                      <div className="label">Avg</div>
+                      <div className="value">
+                        {avg != null ? `${avg.toFixed(2)}s` : '—'}
+                      </div>
+                    </div>
+                    <div className="stat-chip">
+                      <div className="label">Laps</div>
+                      <div className="value">{completedLaps.length}</div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
                     <button
+                      id={`edit-driver-${driver.id}`}
+                      className="btn-icon"
+                      title="Edit Driver Name"
                       onClick={() => {
                         setEditingDriverId(driver.id)
                         setEditingName(driver.name)
                       }}
-                      title="Edit Driver Name"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      id={`delete-driver-${driver.id}`}
+                      className="btn-icon danger"
+                      title="Delete Driver"
+                      onClick={() => deleteDriver(driver.id, driver.name)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Driver Body — fields */}
+                <div className="driver-body">
+                  <div className="driver-fields-row">
+                    <div className="driver-field-sm field">
+                      <label className="field-label" htmlFor={`stint-start-${driver.id}`}>Stint Start</label>
+                      <input
+                        id={`stint-start-${driver.id}`}
+                        type="time"
+                        value={driver.sessionStart}
+                        onChange={(e) =>
+                          updateDriver(driver.id, {
+                            ...driver,
+                            sessionStart: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="driver-field-sm field">
+                      <label className="field-label" htmlFor={`stint-end-${driver.id}`}>Stint End</label>
+                      <input
+                        id={`stint-end-${driver.id}`}
+                        type="time"
+                        value={driver.sessionEnd}
+                        onChange={(e) =>
+                          updateDriver(driver.id, {
+                            ...driver,
+                            sessionEnd: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="driver-field-sm field">
+                      <label className="field-label" htmlFor={`vehicle-${driver.id}`}>Vehicle</label>
+                      <select
+                        id={`vehicle-${driver.id}`}
+                        value={driver.vehicle}
+                        onChange={(e) => {
+                          const vehicle = e.target.value
+                          const isCar =
+                            vehicle === 'Angelique' || vehicle === 'Orion'
+
+                          updateDriver(driver.id, {
+                            ...driver,
+                            vehicle,
+                            tires: isCar
+                              ? (driver.tires ?? {
+                                  frontRight: { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
+                                  frontLeft:  { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
+                                  rearRight:  { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
+                                  rearLeft:   { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
+                                })
+                              : undefined,
+                          })
+                        }}
+                      >
+                        <option value="">Vehicle</option>
+                        <option value="KA 100">KA 100</option>
+                        <option value="Rotax">Rotax</option>
+                        <option value="Shifter">Shifter</option>
+                        <option value="Angelique">Angelique</option>
+                        <option value="Orion">Orion</option>
+                      </select>
+                    </div>
+
+                    <div className="driver-field-grow field">
+                      <label className="field-label" htmlFor={`comments-${driver.id}`}>Comments / Notes</label>
+                      <textarea
+                        id={`comments-${driver.id}`}
+                        ref={(el) => { textAreaRefs.current[driver.id] = el }}
+                        value={driver.comments}
+                        onChange={(e) =>
+                          updateDriver(driver.id, {
+                            ...driver,
+                            comments: e.target.value,
+                          })
+                        }
+                        placeholder="Setup notes, observations…"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Lap Table */}
+                  <LapTable
+                    laps={driver.laps}
+                    bestTime={best}
+                    activeElapsed={activeTimers[driver.id]?.elapsed ?? 0}
+                    onUpdateLap={(lap) => updateLap(driver.id, lap)}
+                    onDeleteLap={(lapId, index) =>
+                      deleteLap(driver.id, lapId, index)
+                    }
+                  />
+                </div>
+
+                {/* Timer Controls */}
+                <div className="timer-controls">
+                  <Timer size={16} style={{ color: 'var(--text-muted)' }} />
+                  {timerActive && (
+                    <span
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '1.1rem',
+                        fontWeight: 700,
+                        color: 'var(--orange-light)',
+                        letterSpacing: '-0.02em',
+                        minWidth: 80,
                       }}
                     >
-                      <Pencil style={{ marginTop: 4 }} size={18} />
-                    </button>
-                  </>
-                )}
+                      {(activeTimers[driver.id]?.elapsed ?? 0).toFixed(2)}s
+                    </span>
+                  )}
+                  {timerActive && (
+                    <span className="badge badge-live">● LIVE</span>
+                  )}
 
-                <button
-                  onClick={() => deleteDriver(driver.id, driver.name)}
-                  title="Delete Driver"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    marginTop: '4px',
-                    color: 'red',
-                  }}
-                >
-                  <Trash2 size={18} />
-                </button>
-              </h2>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 16,
-                  alignItems: 'flex-end',
-                  marginBottom: 12,
-                }}
-              >
-                <div>
-                  <label>Stint Start</label>
-                  <br />
-                  <input
-                    type="time"
-                    value={driver.sessionStart}
-                    onChange={(e) =>
-                      updateDriver(driver.id, {
-                        ...driver,
-                        sessionStart: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+                  <div style={{ flex: 1 }} />
 
-                <div>
-                  <label>Stint End</label>
-                  <br />
-                  <input
-                    type="time"
-                    value={driver.sessionEnd}
-                    onChange={(e) =>
-                      updateDriver(driver.id, {
-                        ...driver,
-                        sessionEnd: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label>Vehicle</label>
-                  <br />
-                  <select
-                    value={driver.vehicle}
-                    onChange={(e) => {
-                      const vehicle = e.target.value
-                      const isCar =
-                        vehicle === 'Angelique' || vehicle === 'Orion'
-
-                      updateDriver(driver.id, {
-                        ...driver,
-                        vehicle,
-                        tires: isCar
-                          ? (driver.tires ?? {
-                              frontRight: {
-                                coldP: '',
-                                coldT: '',
-                                hotP: '',
-                                hotT: '',
-                                depth: '',
-                              },
-                              frontLeft: {
-                                coldP: '',
-                                coldT: '',
-                                hotP: '',
-                                hotT: '',
-                                depth: '',
-                              },
-                              rearRight: {
-                                coldP: '',
-                                coldT: '',
-                                hotP: '',
-                                hotT: '',
-                                depth: '',
-                              },
-                              rearLeft: {
-                                coldP: '',
-                                coldT: '',
-                                hotP: '',
-                                hotT: '',
-                                depth: '',
-                              },
-                            })
-                          : undefined,
-                      })
-                    }}
-                    style={{ height: 23 }}
-                  >
-                    <option value="">Select Vehicle</option>
-                    <option value="KA 100">KA 100</option>
-                    <option value="Rotax">Rotax</option>
-                    <option value="Shifter">Shifter</option>
-                    <option value="Angelique">Angelique</option>
-                    <option value="Orion">Orion</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1, minWidth: 500 }}>
-                  <label>Comments/Notes</label>
-                  <br />
-                  <textarea
-                    ref={(el) => {
-                      textAreaRefs.current[driver.id] = el
-                    }}
-                    value={driver.comments}
-                    onChange={(e) =>
-                      updateDriver(driver.id, {
-                        ...driver,
-                        comments: e.target.value,
-                      })
-                    }
-                    style={{
-                      width: '100%',
-                      minHeight: '40px',
-                      resize: 'none',
-                      overflow: 'hidden',
-                      fontFamily: 'inherit',
-                      fontSize: '14px',
-                      padding: '4px',
-                    }}
-                  />
-                </div>
-              </div>
-              <div style={{ marginTop: 16, marginBottom: 8 }}>
-                <strong>Best Time:</strong>{' '}
-                {best != null ? `${best.toFixed(2)} sec` : '—'} |{' '}
-                <strong>Average Time:</strong>{' '}
-                {avg != null ? `${avg.toFixed(2)} sec` : '—'}
-              </div>
-              <LapTable
-                laps={driver.laps}
-                bestTime={best}
-                activeElapsed={activeTimers[driver.id]?.elapsed ?? 0}
-                onUpdateLap={(lap) => updateLap(driver.id, lap)}
-                onDeleteLap={(lapId, index) =>
-                  deleteLap(driver.id, lapId, index)
-                }
-              />
-              <div style={{ marginTop: 12 }}>
-                {!activeTimers[driver.id]?.startTime ? (
-                  <button onClick={() => startTimer(driver)}>Start</button>
-                ) : (
-                  <>
-                    <button onClick={() => recordLap(driver)}>Lap</button>
-
+                  {!timerActive ? (
                     <button
-                      onClick={() => stopTimer(driver.id)}
-                      style={{ marginLeft: 8 }}
+                      id={`start-timer-${driver.id}`}
+                      className="btn btn-start"
+                      onClick={() => startTimer(driver)}
                     >
-                      Stop
+                      Start
                     </button>
-                  </>
+                  ) : (
+                    <>
+                      <button
+                        id={`lap-timer-${driver.id}`}
+                        className="btn btn-lap"
+                        onClick={() => recordLap(driver)}
+                      >
+                        Lap
+                      </button>
+                      <button
+                        id={`stop-timer-${driver.id}`}
+                        className="btn btn-stop"
+                        onClick={() => stopTimer(driver.id)}
+                      >
+                        Stop
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Tire Data */}
+                {driver.tires && (
+                  <div className="tire-section">
+                    <div className="tire-section-title">Tire Data — {driver.name}</div>
+                    <table className="tire-table">
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left' }}>Corner</th>
+                          <th>Cold P (psi)</th>
+                          <th>Cold T (°C)</th>
+                          <th>Hot P (psi)</th>
+                          <th>Hot T (°C)</th>
+                          <th>Depth (in)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(
+                          [
+                            { key: 'frontRight', label: 'Front Right' },
+                            { key: 'frontLeft',  label: 'Front Left'  },
+                            { key: 'rearRight',  label: 'Rear Right'  },
+                            { key: 'rearLeft',   label: 'Rear Left'   },
+                          ] as const
+                        ).map(({ key, label }) => {
+                          const tire = driver.tires![key as keyof typeof driver.tires]!
+
+                          return (
+                            <tr key={key}>
+                              <td className="tire-label">{label}</td>
+                              {(
+                                ['coldP', 'coldT', 'hotP', 'hotT', 'depth'] as const
+                              ).map((field) => (
+                                <td key={field}>
+                                  <input
+                                    className="tire-input"
+                                    type="text"
+                                    value={tire[field]}
+                                    id={`tire-${driver.id}-${key}-${field}`}
+                                    onChange={(e) =>
+                                      updateDriver(driver.id, {
+                                        ...driver,
+                                        tires: {
+                                          ...driver.tires!,
+                                          [key]: {
+                                            ...tire,
+                                            [field]: e.target.value,
+                                          },
+                                        },
+                                      })
+                                    }
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
-              {driver.tires && (
-                <div style={{ marginTop: 16 }}>
-                  <h3>Tire Data - {driver.name}</h3>
+            )
+          })}
+        </div>
 
-                  <table
-                    border={1}
-                    cellPadding={4}
-                    style={{ width: '100%', borderCollapse: 'collapse' }}
-                  >
-                    <thead>
-                      <tr>
-                        <th></th>
-                        <th>Cold Pressure (psi)</th>
-                        <th>Cold Temp (ºC)</th>
-                        <th>Hot Pressure (psi)</th>
-                        <th>Hot Temp (ºC)</th>
-                        <th>Tire Depth (in)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { key: 'frontRight', label: 'Front Right' },
-                        { key: 'frontLeft', label: 'Front Left' },
-                        { key: 'rearRight', label: 'Rear Right' },
-                        { key: 'rearLeft', label: 'Rear Left' },
-                      ].map(({ key, label }) => {
-                        const tire =
-                          driver.tires![key as keyof typeof driver.tires]
+        {/* ===== RIGHT / SIDEBAR ===== */}
+        <div className="side-panel">
+          <div className="track-card">
+            <div className="track-card-header">
+              <MapPin size={14} style={{ color: 'var(--orange-light)' }} />
+              <span className="track-card-title">Track Layout</span>
+            </div>
 
-                        return (
-                          <tr key={key}>
-                            <td>
-                              <strong>{label}</strong>
-                            </td>
-
-                            {(
-                              [
-                                'coldP',
-                                'coldT',
-                                'hotP',
-                                'hotT',
-                                'depth',
-                              ] as const
-                            ).map((field) => (
-                              <td key={field}>
-                                <input
-                                  type="text"
-                                  value={tire[field]}
-                                  onChange={(e) =>
-                                    updateDriver(driver.id, {
-                                      ...driver,
-                                      tires: {
-                                        ...driver.tires!,
-                                        [key]: {
-                                          ...tire,
-                                          [field]: e.target.value,
-                                        },
-                                      },
-                                    })
-                                  }
-                                  style={{
-                                    width: '100%',
-                                    border: 'none',
-                                    textAlign: 'center',
-                                  }}
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+            <div className="track-img-container">
+              {trackImage ? (
+                <img src={trackImage} alt="Track layout" />
+              ) : (
+                <div className="track-placeholder">
+                  <span className="track-placeholder-icon">🗺️</span>
+                  <span className="track-placeholder-text">No layout uploaded</span>
                 </div>
               )}
             </div>
-          )
-        })}
-      </div>
-      <div style={{ flex: 2 }}>
-        <div
-          style={{
-            border: '1px solid black',
-            padding: 16,
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Track Layout</h2>
 
-          <div
-            style={{
-              width: '100%',
-              border: '1px dashed gray',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 12,
-              minHeight: 80,
-            }}
-          >
-            {trackImage ? (
-              <img
-                src={trackImage}
-                alt="Track"
-                style={{ width: '100%', height: 'auto', display: 'block' }}
+            <div className="track-card-footer">
+              <label className="file-upload-label" htmlFor="track-image-upload">
+                <Upload size={14} />
+                {trackImage ? 'Replace Image' : 'Upload Layout'}
+              </label>
+              <input
+                id="track-image-upload"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    setTrackImage(reader.result as string)
+                  }
+                  reader.readAsDataURL(file)
+                }}
               />
-            ) : (
-              <span style={{ color: 'gray', padding: 16 }}>
-                No image uploaded
-              </span>
-            )}
+            </div>
           </div>
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-
-              const reader = new FileReader()
-              reader.onload = () => {
-                setTrackImage(reader.result as string)
-              }
-              reader.readAsDataURL(file)
-            }}
-          />
         </div>
       </div>
-    </div>
+    </>
   )
 }

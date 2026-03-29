@@ -17,49 +17,61 @@ export default function LapTable({
   onUpdateLap,
   onDeleteLap,
 }: Props) {
-  if (!laps.length) return <div>No laps yet</div>
+  if (!laps.length)
+    return (
+      <div className="no-laps">
+        No laps recorded yet — start the timer below
+      </div>
+    )
 
   return (
-    <table border={1} cellPadding={8} style={{ borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          <th>Lap</th>
-          <th>Lap Time 1</th>
-          <th>Lap Time 2</th>
-          <th>Cones Hit</th>
-          <th>Off Track</th>
-          <th>Final Time</th>
-        </tr>
-      </thead>
+    <div className="lap-table-wrap">
+      <table className="lap-table">
+        <thead>
+          <tr>
+            <th style={{ width: 70 }}>Lap</th>
+            <th>Time 1</th>
+            <th>Time 2</th>
+            <th>Cones Hit</th>
+            <th>Off Track</th>
+            <th>Final</th>
+          </tr>
+        </thead>
 
-      <tbody>
-        {laps.map((lap, index) => {
-          const finalTime = getFinalTime(lap)
-          const isBest =
-            finalTime != null && bestTime != null && finalTime === bestTime
+        <tbody>
+          {laps.map((lap, index) => {
+            const finalTime = getFinalTime(lap)
+            const isBest =
+              finalTime != null && bestTime != null && finalTime === bestTime
 
-          return (
-            <tr key={lap.id}>
-              <LapRow
-                lap={lap}
-                index={index}
-                activeElapsed={activeElapsed}
-                onChange={onUpdateLap}
-                onDelete={() => onDeleteLap(lap.id, index)}
-              />
+            return (
+              <tr key={lap.id}>
+                <LapRow
+                  lap={lap}
+                  index={index}
+                  activeElapsed={activeElapsed}
+                  onChange={onUpdateLap}
+                  onDelete={() => onDeleteLap(lap.id, index)}
+                />
 
-              <td
-                style={{
-                  fontWeight: isBest ? 'bold' : undefined,
-                  color: isBest ? 'green' : undefined,
-                }}
-              >
-                {finalTime != null ? `${finalTime.toFixed(2)} sec` : '—'}
-              </td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
+                <td>
+                  {finalTime != null ? (
+                    <span
+                      className={
+                        isBest ? 'lap-final-best' : 'lap-final-normal'
+                      }
+                    >
+                      {finalTime.toFixed(2)}s{isBest && ' ★'}
+                    </span>
+                  ) : (
+                    <span className="lap-final-dash">—</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }

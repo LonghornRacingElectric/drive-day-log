@@ -1,7 +1,7 @@
 # Longhorn Racing Drive Day Log
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Deployed](https://img.shields.io/badge/deployed-vercel-black)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 
 A web-based logging tool for Longhorn Racing drive days.
 
@@ -13,6 +13,11 @@ Used by Trackside Engineering to record driver performance, lap times, penalties
 This tool is maintained by Longhorn Racing and is available at:
 
 https://driveday.lhre.org
+
+
+## 📸 Preview
+![Preview](./public/preview_metadata.png)
+![Preview](./public/preview_timer.png)
 
 
 ## 🎯 Purpose
@@ -73,8 +78,8 @@ See [CHANGELOG.md](./CHANGELOG.md) for full version history.
 
 
 ## 👥 Maintainers
-- Nathan Yee (Trackside Engineering)
+Nathan Yee (Trackside Engineering)
 
 
 ## 📦 Version
-Current version: 1.0.0
+Current version: 1.1.0
