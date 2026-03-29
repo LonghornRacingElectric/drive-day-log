@@ -1,7 +1,8 @@
 # Longhorn Racing Drive Day Log
 
-- A web-based logging tool for Longhorn Racing drive days.
-- Used by Trackside Engineering to record driver performance, lap times, penalties, and session conditions.
+A web-based logging tool for Longhorn Racing drive days.
+
+Used by Trackside Engineering to record driver performance, lap times, penalties, and session conditions.
 
 ## 🌐 Official Tool
 This tool is maintained by Longhorn Racing and is available at:
@@ -22,7 +23,7 @@ https://driveday.lhre.org
   - +2s per cone
   - +20s per missed gate
 - Session metadata:
-  - Event data (Skidpad, Autocross, Endurance, Kart)
+  - Event type (Skidpad, Autocross, Endurance, Kart)
   - Weather & track conditions
   - Start/end times
   - Power limit & distance
@@ -46,11 +47,11 @@ https://driveday.lhre.org
 - If two laps are entered, average is used
 - Penalties are applied after base time calculation
 
-$$Final Time = baseTime + (2 * cones) + (20 * offtrack)$$
+$$Final Time = baseTime + (2 \times cones) + (20 \times offtrack)$$
 
 
 ## ⚠️ Data Storage
-- Stored in browser (local storage)
+- Stored in browser (LocalStorage)
 - Clearing browser data will erase session
 - Not synced across devices (yet)
 
@@ -58,7 +59,7 @@ $$Final Time = baseTime + (2 * cones) + (20 * offtrack)$$
 ## 🛠️ Tech Stack
 - React + TypeScript
 - Vite
-- Local Storage
+- LocalStorage
 - Vercel (deployment)
 
 
