@@ -1,75 +1,75 @@
 // React
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 // Third party
-import { Trash2, Pencil, Plus, MapPin, RotateCcw, Upload, Flag, Timer, Zap, Download, Trophy, BarChart2 } from 'lucide-react'
+import {
+  Trash2,
+  Pencil,
+  Plus,
+  MapPin,
+  RotateCcw,
+  Upload,
+  Flag,
+  Timer,
+  Zap,
+  Download,
+  Trophy,
+  BarChart2,
+  LogOut,
+  Loader2,
+} from 'lucide-react'
 
 // Internal utilities
-import { getBestTime, getAverageTime, getTotalPenalties, getPenaltiesPerLap, getStdDev, getFinalTime } from './calculations'
+import {
+  getBestTime,
+  getAverageTime,
+  getTotalPenalties,
+  getPenaltiesPerLap,
+  getStdDev,
+  getFinalTime,
+} from './calculations'
 import type { Lap } from './calculations'
 
 // Internal components
 import LapTable from './components/LapTable'
 import ConfirmModal from './components/ConfirmModal'
+import SessionGate from './components/SessionGate'
 
 // Internal types
 import type { Driver, SOCData, SessionMetadata } from './types/driveDay'
 import { exportDriveDayPDF } from './exportPDF'
+import { useSession, defaultMeta } from './hooks/useSession'
 
 export default function App() {
-  const [drivers, setDrivers] = useState<Driver[]>(() => {
-    const saved = localStorage.getItem('driveDayDrivers')
-    return saved ? JSON.parse(saved) : []
-  })
+  // ── Firestore session ────────────────────────────────────────────────────
+  const session = useSession()
+  const isMarshal = session.role === 'marshal'
+  const [copied, setCopied] = useState(false)
 
+  // ── Live timer state (local only — never written to Firestore) ────────────
   const [activeTimers, setActiveTimers] = useState<
     Record<
       string,
-      {
-        startTime: number | null
-        elapsed: number
-        intervalId: number | null
-      }
+      { startTime: number; elapsed: number; intervalId: number | null }
     >
   >({})
+  const [liveLaps, setLiveLaps] = useState<Record<string, Lap>>({}) // driverId → live Lap
+  const startRef = useRef<Record<string, number>>({})
+
+  // ── Local UI state ────────────────────────────────────────────────────────
   const [newDriverName, setNewDriverName] = useState('')
-  const [sessionMeta, setSessionMeta] = useState<SessionMetadata>(() => {
-    const saved = localStorage.getItem('driveDayMeta')
-    return saved
-      ? JSON.parse(saved)
-      : {
-          date: '',
-          event: '',
-          weather: '',
-          startTime: '',
-          endTime: '',
-          sessionGoals: '',
-          powerLimit: '',
-          totalDistance: '',
-          trackConditions: {
-            wind: '',
-            humidity: '',
-            ambientTemp: '',
-            trackTemp: '',
-            wetTrack: false,
-          },
-          stateOfCharge: [
-            {
-              id: crypto.randomUUID(),
-              initialSOC: '',
-              finalSOC: '',
-              initialVolts: '',
-              finalVolts: '',
-            },
-          ],
-        }
-  })
+
+  // sessionMeta + trackImage — Firestore is the source of truth.
+  // We keep local state for smooth editing and sync bidirectionally.
+  const [sessionMeta, setSessionMeta] = useState<SessionMetadata>(defaultMeta)
+  const [trackImage, setTrackImage] = useState<string | null>(null)
+  const metaInitialized = useRef(false) // true once we've pulled from Firestore
+  const metaDebounceTimer = useRef<number | null>(null)
 
   const [editingDriverId, setEditingDriverId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [trackImage, setTrackImage] = useState<string | null>(null)
 
-  // Confirm modal state
+  // Confirm modal
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean
     title: string
@@ -92,73 +92,107 @@ export default function App() {
   }) {
     setConfirmModal({ open: true, confirmLabel: 'Delete', ...opts })
   }
-
   function closeConfirm() {
     setConfirmModal((m) => ({ ...m, open: false }))
   }
 
   const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
 
-  useEffect(() => {
-    localStorage.setItem('driveDayDrivers', JSON.stringify(drivers))
-  }, [drivers])
-  useEffect(() => {
-    localStorage.setItem('driveDayMeta', JSON.stringify(sessionMeta))
-  }, [sessionMeta])
-
-  useEffect(() => {
-    const saved = localStorage.getItem('trackImage')
-    if (saved) setTrackImage(saved)
-  }, [])
-
-  useEffect(() => {
-    if (trackImage) {
-      localStorage.setItem('trackImage', trackImage)
+  // Merge Firestore drivers with local live laps for display
+  const drivers: Driver[] = session.drivers.map((d) => {
+    const liveLap = liveLaps[d.id]
+    if (liveLap) {
+      const elapsed = activeTimers[d.id]?.elapsed ?? 0
+      return {
+        ...d,
+        laps: [
+          ...d.laps,
+          { ...liveLap, time1: parseFloat(elapsed.toFixed(3)) },
+        ],
+      }
     }
-  }, [trackImage])
+    return d
+  })
+
+  // ── Firestore ↔ local sync ────────────────────────────────────────────────
+
+  // 1. On first connect (or session change), pull meta + trackImage from Firestore
+  useEffect(() => {
+    if (session.connected) {
+      setSessionMeta(session.sessionMeta)
+      setTrackImage(session.trackImage)
+      metaInitialized.current = true
+    }
+  }, [session.connected, session.sessionCode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 2. Marshals: keep in sync whenever host changes meta
+  useEffect(() => {
+    if (session.role === 'marshal') {
+      setSessionMeta(session.sessionMeta)
+    }
+  }, [session.sessionMeta, session.role])
+
+  // 3. Marshals: keep in sync when host updates track image
+  useEffect(() => {
+    if (session.role === 'marshal') {
+      setTrackImage(session.trackImage)
+    }
+  }, [session.trackImage, session.role])
+
+  // 4. Host: debounce-write sessionMeta changes to Firestore (600 ms)
+  const updateMetaDebounced = useCallback(
+    (meta: SessionMetadata) => {
+      if (metaDebounceTimer.current) clearTimeout(metaDebounceTimer.current)
+      metaDebounceTimer.current = window.setTimeout(() => {
+        session.updateMeta(meta)
+      }, 600)
+    },
+    [session]
+  )
 
   useEffect(() => {
-    drivers.forEach((driver) => {
+    if (!metaInitialized.current) return // skip until we've pulled from Firestore
+    if (session.role !== 'host') return
+    updateMetaDebounced(sessionMeta)
+    return () => {
+      if (metaDebounceTimer.current) clearTimeout(metaDebounceTimer.current)
+    }
+  }, [sessionMeta]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-resize textareas
+  useEffect(() => {
+    session.drivers.forEach((driver) => {
       const el = textAreaRefs.current[driver.id]
       if (el) {
         el.style.height = 'auto'
         el.style.height = el.scrollHeight + 'px'
       }
     })
-  }, [drivers])
+  }, [session.drivers])
 
-  function addDriver() {
+  async function addDriver() {
     if (!newDriverName.trim()) return
-
-    setDrivers((d) => [
-      ...d,
-      {
-        id: crypto.randomUUID(),
-        name: newDriverName.trim(),
-        laps: [],
-        sessionStart: '',
-        sessionEnd: '',
-        vehicle: '',
-        comments: '',
-      },
-    ])
-
+    const driver: Driver = {
+      id: crypto.randomUUID(),
+      name: newDriverName.trim(),
+      laps: [],
+      sessionStart: '',
+      sessionEnd: '',
+      vehicle: '',
+      comments: '',
+    }
     setNewDriverName('')
+    await session.addDriver(driver)
   }
 
-  function updateLap(driverId: string, updatedLap: Lap) {
-    setDrivers((drivers) =>
-      drivers.map((driver) =>
-        driver.id === driverId
-          ? {
-              ...driver,
-              laps: driver.laps.map((l) =>
-                l.id === updatedLap.id ? updatedLap : l
-              ),
-            }
-          : driver
-      )
-    )
+  async function updateLap(driverId: string, updatedLap: Lap) {
+    const fsDriver = session.drivers.find((d) => d.id === driverId)
+    if (!fsDriver) return
+    const updated = {
+      ...fsDriver,
+      laps: fsDriver.laps.map((l) => (l.id === updatedLap.id ? updatedLap : l)),
+    }
+    await session.updateDriver(driverId, updated)
   }
 
   function deleteLap(driverId: string, lapId: string, index: number) {
@@ -166,14 +200,13 @@ export default function App() {
       title: `Delete Lap ${index + 1}?`,
       message: 'This lap will be permanently removed. This cannot be undone.',
       confirmLabel: 'Delete Lap',
-      onConfirm: () => {
-        setDrivers((drivers) =>
-          drivers.map((d) =>
-            d.id === driverId
-              ? { ...d, laps: d.laps.filter((l) => l.id !== lapId) }
-              : d
-          )
-        )
+      onConfirm: async () => {
+        const fsDriver = session.drivers.find((d) => d.id === driverId)
+        if (!fsDriver) return
+        await session.updateDriver(driverId, {
+          ...fsDriver,
+          laps: fsDriver.laps.filter((l) => l.id !== lapId),
+        })
       },
     })
   }
@@ -181,18 +214,29 @@ export default function App() {
   function deleteDriver(driverId: string, driverName: string) {
     openConfirm({
       title: `Delete ${driverName}'s Stint?`,
-      message: 'All laps and data for this stint will be permanently removed. This cannot be undone.',
+      message:
+        'All laps and data for this stint will be permanently removed. This cannot be undone.',
       confirmLabel: 'Delete Stint',
-      onConfirm: () => {
-        setDrivers((drivers) => drivers.filter((d) => d.id !== driverId))
+      onConfirm: async () => {
+        const t = activeTimers[driverId]
+        if (t?.intervalId != null) clearInterval(t.intervalId)
+        setLiveLaps((p) => {
+          const u = { ...p }
+          delete u[driverId]
+          return u
+        })
+        setActiveTimers((p) => {
+          const u = { ...p }
+          delete u[driverId]
+          return u
+        })
+        await session.deleteDriver(driverId)
       },
     })
   }
 
-  function updateDriver(driverId: string, updated: Driver) {
-    setDrivers((drivers) =>
-      drivers.map((d) => (d.id === driverId ? updated : d))
-    )
+  async function updateDriver(driverId: string, updated: Driver) {
+    await session.updateDriver(driverId, updated)
   }
 
   function updateSOC(updated: SOCData) {
@@ -235,51 +279,26 @@ export default function App() {
   function resetSession() {
     openConfirm({
       title: 'Reset Session?',
-      message: 'This will permanently remove all drivers, laps, and session info. This cannot be undone.',
+      message:
+        'This will permanently remove all drivers, laps, and session info. This cannot be undone.',
       confirmLabel: 'Reset Everything',
-      onConfirm: () => {
-
-    setDrivers([])
-    setSessionMeta({
-      date: '',
-      event: '',
-      weather: '',
-      startTime: '',
-      endTime: '',
-      sessionGoals: '',
-      powerLimit: '',
-      totalDistance: '',
-      trackConditions: {
-        wind: '',
-        humidity: '',
-        ambientTemp: '',
-        trackTemp: '',
-        wetTrack: false,
-      },
-      stateOfCharge: [
-        {
-          id: crypto.randomUUID(),
-          initialSOC: '',
-          finalSOC: '',
-          initialVolts: '',
-          finalVolts: '',
-        },
-      ],
-    })
-
-      setTrackImage(null)
-      localStorage.removeItem('trackImage')
-      localStorage.removeItem('driveDayDrivers')
-      localStorage.removeItem('driveDayMeta')
+      onConfirm: async () => {
+        Object.values(activeTimers).forEach((t) => {
+          if (t.intervalId != null) clearInterval(t.intervalId)
+        })
+        setActiveTimers({})
+        setLiveLaps({})
+        setTrackImage(null)
+        setSessionMeta(defaultMeta)
+        localStorage.removeItem('trackImage')
+        localStorage.removeItem('driveDayMeta')
+        await session.resetAllDrivers(session.drivers)
       },
     })
   }
 
-  const startRef = useRef<number>(0)
-
   function startTimer(driver: Driver) {
-    startRef.current = Date.now()
-
+    startRef.current[driver.id] = Date.now()
     const liveLap: Lap = {
       id: crypto.randomUUID(),
       time1: 0,
@@ -288,103 +307,86 @@ export default function App() {
       offTrack: 0,
       isLive: true,
     }
-
-    setDrivers((drivers) =>
-      drivers.map((d) =>
-        d.id === driver.id ? { ...d, laps: [...d.laps, liveLap] } : d
-      )
-    )
-
+    setLiveLaps((prev) => ({ ...prev, [driver.id]: liveLap }))
     const intervalId = window.setInterval(() => {
       setActiveTimers((prev) => ({
         ...prev,
         [driver.id]: {
           ...prev[driver.id],
-          elapsed: (Date.now() - startRef.current) / 1000,
+          elapsed: (Date.now() - startRef.current[driver.id]) / 1000,
         },
       }))
     }, 50)
-
     setActiveTimers((prev) => ({
       ...prev,
-      [driver.id]: {
-        startTime: startRef.current,
-        elapsed: 0,
-        intervalId,
-      },
+      [driver.id]: { startTime: Date.now(), elapsed: 0, intervalId },
     }))
   }
 
-  function recordLap(driver: Driver) {
+  async function recordLap(driver: Driver) {
     const elapsed = activeTimers[driver.id]?.elapsed ?? 0
-    const newStart = Date.now()
-    startRef.current = newStart
+    const liveLap = liveLaps[driver.id]
+    if (!liveLap) return
 
-    setDrivers((drivers) =>
-      drivers.map((d) => {
-        if (d.id !== driver.id) return d
-
-        const finalized = d.laps.map((lap) =>
-          lap.isLive ? { ...lap, isLive: false, time1: elapsed } : lap
-        )
-
-        const newLiveLap: Lap = {
-          id: crypto.randomUUID(),
-          time1: 0,
-          time2: null,
-          cones: 0,
-          offTrack: 0,
-          isLive: true,
-        }
-
-        return {
-          ...d,
-          laps: [...finalized, newLiveLap],
-        }
+    const completedLap: Lap = {
+      ...liveLap,
+      time1: parseFloat(elapsed.toFixed(3)),
+      isLive: false,
+    }
+    const fsDriver = session.drivers.find((d) => d.id === driver.id)
+    if (fsDriver) {
+      await session.updateDriver(driver.id, {
+        ...fsDriver,
+        laps: [...fsDriver.laps, completedLap],
       })
-    )
-
-    setActiveTimers((prev) => ({
-      ...prev,
-      [driver.id]: {
-        ...prev[driver.id],
-        startTime: newStart,
-        elapsed: 0,
-      },
-    }))
-  }
-
-  function stopTimer(driverId: string) {
-    const timer = activeTimers[driverId]
-    if (!timer) return
-
-    if (timer.intervalId !== null) {
-      clearInterval(timer.intervalId)
     }
 
-    setDrivers((drivers) =>
-      drivers.map((d) =>
-        d.id === driverId
-          ? {
-              ...d,
-              laps: d.laps.map((lap) =>
-                lap.isLive
-                  ? {
-                      ...lap,
-                      isLive: false,
-                      time1: activeTimers[driverId]?.elapsed ?? lap.time1,
-                    }
-                  : lap
-              ),
-            }
-          : d
-      )
-    )
+    const newLiveLap: Lap = {
+      id: crypto.randomUUID(),
+      time1: 0,
+      time2: null,
+      cones: 0,
+      offTrack: 0,
+      isLive: true,
+    }
+    setLiveLaps((prev) => ({ ...prev, [driver.id]: newLiveLap }))
+    startRef.current[driver.id] = Date.now()
+    setActiveTimers((prev) => ({
+      ...prev,
+      [driver.id]: { ...prev[driver.id], startTime: Date.now(), elapsed: 0 },
+    }))
+  }
 
+  async function stopTimer(driverId: string) {
+    const timer = activeTimers[driverId]
+    if (!timer) return
+    if (timer.intervalId !== null) clearInterval(timer.intervalId)
+
+    const liveLap = liveLaps[driverId]
+    if (liveLap) {
+      const completedLap: Lap = {
+        ...liveLap,
+        time1: parseFloat((timer.elapsed ?? 0).toFixed(3)),
+        isLive: false,
+      }
+      const fsDriver = session.drivers.find((d) => d.id === driverId)
+      if (fsDriver) {
+        await session.updateDriver(driverId, {
+          ...fsDriver,
+          laps: [...fsDriver.laps, completedLap],
+        })
+      }
+    }
+
+    setLiveLaps((prev) => {
+      const u = { ...prev }
+      delete u[driverId]
+      return u
+    })
     setActiveTimers((prev) => {
-      const updated = { ...prev }
-      delete updated[driverId]
-      return updated
+      const u = { ...prev }
+      delete u[driverId]
+      return u
     })
   }
 
@@ -400,6 +402,62 @@ export default function App() {
 
   const isTimerActive = (driverId: string) =>
     !!activeTimers[driverId]?.startTime
+
+  // ── Session gate & loading guards ─────────────────────────────────────────
+  if (!session.sessionCode) {
+    return (
+      <SessionGate
+        onCreate={session.createSession}
+        onJoin={session.joinSession}
+      />
+    )
+  }
+
+  if (session.loading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          gap: 12,
+          color: 'var(--text-muted)',
+        }}
+      >
+        <Loader2 size={20} className="spin" />
+        <span style={{ fontSize: '0.9rem' }}>Connecting to session…</span>
+      </div>
+    )
+  }
+
+  if (!session.connected) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          gap: 16,
+          color: 'var(--text-muted)',
+        }}
+      >
+        <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+        <span style={{ fontSize: '0.95rem' }}>
+          Unable to connect to session.
+        </span>
+        <button
+          className="btn btn-ghost"
+          onClick={session.leaveSession}
+          style={{ marginTop: 4 }}
+        >
+          Back to Session Gate
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -421,10 +479,14 @@ export default function App() {
         <div className="header-inner">
           <div className="header-brand">
             <img
-            src="/lhr_logo.png"
-            alt="Longhorn Racing"
-            style={{ height: 44, width: 'auto', filter: 'brightness(0) invert(1)' }}
-          />
+              src="/lhr_logo.png"
+              alt="Longhorn Racing"
+              style={{
+                height: 44,
+                width: 'auto',
+                filter: 'brightness(0) invert(1)',
+              }}
+            />
             <div className="header-titles">
               <h1>Drive Day Log</h1>
               <div className="subtitle">Longhorn Racing Electric</div>
@@ -442,10 +504,43 @@ export default function App() {
               }
               placeholder="Enter session objectives…"
               style={{ flex: 1 }}
+              disabled={isMarshal}
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Role badge */}
+            <div
+              className={`role-badge ${isMarshal ? 'marshal' : 'admin'}`}
+              title="User role"
+            >
+              {isMarshal ? 'MARSHAL' : 'ADMIN'}
+            </div>
+
+            {/* Session code badge */}
+            <div
+              className="session-code-badge"
+              title="Click to copy session code"
+              onClick={() => {
+                if (session.sessionCode) {
+                  navigator.clipboard.writeText(session.sessionCode)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1000)
+                }
+              }}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+            >
+              <span
+                style={{
+                  minWidth: '6ch',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                }}
+              >
+                {copied ? 'COPIED' : session.sessionCode}
+              </span>
+            </div>
+
             <button
               id="export-pdf-btn"
               className="btn btn-ghost"
@@ -456,13 +551,24 @@ export default function App() {
               Export
             </button>
 
+            {!isMarshal && (
+              <button
+                id="reset-session-btn"
+                className="btn btn-danger"
+                onClick={resetSession}
+              >
+                <RotateCcw size={14} />
+                Reset Session
+              </button>
+            )}
+
             <button
-              id="reset-session-btn"
-              className="btn btn-danger"
-              onClick={resetSession}
+              id="leave-session-btn"
+              className="btn btn-ghost"
+              onClick={session.leaveSession}
+              title="Leave session"
             >
-              <RotateCcw size={14} />
-              Reset Session
+              <LogOut size={14} />
             </button>
           </div>
         </div>
@@ -470,23 +576,37 @@ export default function App() {
 
       {/* ── Main layout ── */}
       <div className="app-layout">
-
         {/* ===== LEFT / MAIN PANEL ===== */}
         <div className="main-panel">
-
           {/* Session Info Card */}
           <div className="card">
             <div className="card-header">
               <span className="card-title">
-                <Flag size={12} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-light)' }} />
+                <Flag
+                  size={12}
+                  style={{
+                    display: 'inline',
+                    marginRight: 6,
+                    verticalAlign: 'middle',
+                    color: 'var(--orange-light)',
+                  }}
+                />
                 Session Info
               </span>
             </div>
 
             {/* Row 1: Date / Event / Weather */}
-            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 12 }}>
+            <div
+              className="form-grid"
+              style={{
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                marginBottom: 12,
+              }}
+            >
               <div className="field">
-                <label className="field-label" htmlFor="session-date">Date</label>
+                <label className="field-label" htmlFor="session-date">
+                  Date
+                </label>
                 <input
                   id="session-date"
                   type="date"
@@ -494,28 +614,36 @@ export default function App() {
                   onChange={(e) =>
                     setSessionMeta({ ...sessionMeta, date: e.target.value })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="session-event">Event</label>
+                <label className="field-label" htmlFor="session-event">
+                  Event
+                </label>
                 <select
                   id="session-event"
                   value={sessionMeta.event}
                   onChange={(e) =>
                     setSessionMeta({ ...sessionMeta, event: e.target.value })
                   }
+                  disabled={isMarshal}
                 >
                   <option value="">Select</option>
                   <option value="Skidpad">Skidpad</option>
                   <option value="Autocross">Autocross</option>
                   <option value="Endurance">Endurance</option>
-                  <option value="Kart Driver Training">Kart Driver Training</option>
+                  <option value="Kart Driver Training">
+                    Kart Driver Training
+                  </option>
                 </select>
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="session-weather">Weather</label>
+                <label className="field-label" htmlFor="session-weather">
+                  Weather
+                </label>
                 <input
                   id="session-weather"
                   type="text"
@@ -524,27 +652,42 @@ export default function App() {
                   onChange={(e) =>
                     setSessionMeta({ ...sessionMeta, weather: e.target.value })
                   }
+                  disabled={isMarshal}
                 />
               </div>
             </div>
 
             {/* Row 2: Day Start / Day End / Power Limit / Total Distance */}
-            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 14 }}>
+            <div
+              className="form-grid"
+              style={{
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                marginBottom: 14,
+              }}
+            >
               <div className="field">
-                <label className="field-label" htmlFor="session-start">Day Start</label>
+                <label className="field-label" htmlFor="session-start">
+                  Day Start
+                </label>
                 <input
                   id="session-start"
                   type="time"
                   step={60}
                   value={sessionMeta.startTime}
                   onChange={(e) =>
-                    setSessionMeta({ ...sessionMeta, startTime: e.target.value })
+                    setSessionMeta({
+                      ...sessionMeta,
+                      startTime: e.target.value,
+                    })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="session-end">Day End</label>
+                <label className="field-label" htmlFor="session-end">
+                  Day End
+                </label>
                 <input
                   id="session-end"
                   type="time"
@@ -553,12 +696,20 @@ export default function App() {
                   onChange={(e) =>
                     setSessionMeta({ ...sessionMeta, endTime: e.target.value })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
               <div className="field">
                 <label className="field-label" htmlFor="power-limit">
-                  <Zap size={10} style={{ display: 'inline', marginRight: 3, verticalAlign: 'middle' }} />
+                  <Zap
+                    size={10}
+                    style={{
+                      display: 'inline',
+                      marginRight: 3,
+                      verticalAlign: 'middle',
+                    }}
+                  />
                   Power Limit
                 </label>
                 <input
@@ -567,13 +718,19 @@ export default function App() {
                   placeholder="e.g. 80 kW"
                   value={sessionMeta.powerLimit}
                   onChange={(e) =>
-                    setSessionMeta({ ...sessionMeta, powerLimit: e.target.value })
+                    setSessionMeta({
+                      ...sessionMeta,
+                      powerLimit: e.target.value,
+                    })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="total-distance">Total Distance</label>
+                <label className="field-label" htmlFor="total-distance">
+                  Total Distance
+                </label>
                 <input
                   id="total-distance"
                   type="number"
@@ -585,6 +742,7 @@ export default function App() {
                       totalDistance: e.target.value,
                     })
                   }
+                  disabled={isMarshal}
                 />
               </div>
             </div>
@@ -598,7 +756,9 @@ export default function App() {
 
             <div className="form-grid">
               <div className="field">
-                <label className="field-label" htmlFor="cond-wind">Wind (mph)</label>
+                <label className="field-label" htmlFor="cond-wind">
+                  Wind (mph)
+                </label>
                 <input
                   id="cond-wind"
                   type="number"
@@ -612,11 +772,14 @@ export default function App() {
                       },
                     })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="cond-humidity">Humidity (%)</label>
+                <label className="field-label" htmlFor="cond-humidity">
+                  Humidity (%)
+                </label>
                 <input
                   id="cond-humidity"
                   type="number"
@@ -630,11 +793,14 @@ export default function App() {
                       },
                     })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="cond-ambient">Ambient Temp (°F)</label>
+                <label className="field-label" htmlFor="cond-ambient">
+                  Ambient Temp (°F)
+                </label>
                 <input
                   id="cond-ambient"
                   type="number"
@@ -648,11 +814,14 @@ export default function App() {
                       },
                     })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="cond-track-temp">Track Temp (°F)</label>
+                <label className="field-label" htmlFor="cond-track-temp">
+                  Track Temp (°F)
+                </label>
                 <input
                   id="cond-track-temp"
                   type="number"
@@ -666,6 +835,7 @@ export default function App() {
                       },
                     })
                   }
+                  disabled={isMarshal}
                 />
               </div>
 
@@ -685,9 +855,12 @@ export default function App() {
                         },
                       })
                     }
+                    disabled={isMarshal}
                   />
                   <span>
-                    {sessionMeta.trackConditions.wetTrack ? 'Yes — wet' : 'No — dry'}
+                    {sessionMeta.trackConditions.wetTrack
+                      ? 'Yes — wet'
+                      : 'No — dry'}
                   </span>
                 </label>
               </div>
@@ -698,7 +871,15 @@ export default function App() {
           <div className="card">
             <div className="card-header">
               <span className="card-title">
-                <Zap size={12} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-light)' }} />
+                <Zap
+                  size={12}
+                  style={{
+                    display: 'inline',
+                    marginRight: 6,
+                    verticalAlign: 'middle',
+                    color: 'var(--orange-light)',
+                  }}
+                />
                 State of Charge
               </span>
             </div>
@@ -718,7 +899,14 @@ export default function App() {
                   <tr key={row.id}>
                     <td className="row-num">{index + 1}</td>
 
-                    {(['initialSOC', 'finalSOC', 'initialVolts', 'finalVolts'] as const).map((field) => (
+                    {(
+                      [
+                        'initialSOC',
+                        'finalSOC',
+                        'initialVolts',
+                        'finalVolts',
+                      ] as const
+                    ).map((field) => (
                       <td key={field}>
                         <input
                           className="table-input"
@@ -727,6 +915,7 @@ export default function App() {
                             updateSOC({ ...row, [field]: e.target.value })
                           }
                           id={`soc-${index}-${field}`}
+                          disabled={isMarshal}
                         />
                       </td>
                     ))}
@@ -737,39 +926,44 @@ export default function App() {
           </div>
 
           {/* Add Driver Row */}
-          <div className="add-driver-row section-gap">
-            <Plus size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <select
-              id="new-driver-name"
-              value={newDriverName}
-              onChange={(e) => setNewDriverName(e.target.value)}
-              style={{ flex: 1 }}
-            >
-              <option value="">Select driver…</option>
-              <option>Viraj Bhalla</option>
-              <option>Andrew Cloran</option>
-              <option>Luke Ballengee</option>
-              <option>Ali Jensen</option>
-              <option>Oliver Belforti</option>
-              <option>Shreyas Vatts</option>
-            </select>
-            <button
-              id="add-driver-btn"
-              className="btn btn-primary"
-              onClick={addDriver}
-            >
-              Add Driver
-            </button>
-          </div>
+          {!isMarshal && (
+            <div className="add-driver-row section-gap">
+              <Plus
+                size={16}
+                style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+              />
+              <select
+                id="new-driver-name"
+                value={newDriverName}
+                onChange={(e) => setNewDriverName(e.target.value)}
+                style={{ flex: 1 }}
+              >
+                <option value="">Select driver…</option>
+                <option>Viraj Bhalla</option>
+                <option>Andrew Cloran</option>
+                <option>Luke Ballengee</option>
+                <option>Ali Jensen</option>
+                <option>Oliver Belforti</option>
+                <option>Shreyas Vatts</option>
+              </select>
+              <button
+                id="add-driver-btn"
+                className="btn btn-primary"
+                onClick={addDriver}
+              >
+                Add Driver
+              </button>
+            </div>
+          )}
 
           {/* ── Driver Cards ── */}
           {drivers.map((driver) => {
             const completedLaps = driver.laps.filter((lap) => !lap.isLive)
-            const best       = getBestTime(completedLaps)
-            const avg        = getAverageTime(completedLaps)
-            const penalties  = getTotalPenalties(completedLaps)
-            const penPerLap  = getPenaltiesPerLap(completedLaps)
-            const stdDev     = getStdDev(completedLaps)
+            const best = getBestTime(completedLaps)
+            const avg = getAverageTime(completedLaps)
+            const penalties = getTotalPenalties(completedLaps)
+            const penPerLap = getPenaltiesPerLap(completedLaps)
+            const stdDev = getStdDev(completedLaps)
             const timerActive = isTimerActive(driver.id)
 
             return (
@@ -812,7 +1006,9 @@ export default function App() {
                       <div className="driver-name">{driver.name}</div>
                     )}
                     {driver.vehicle && (
-                      <div className="driver-vehicle-badge">{driver.vehicle}</div>
+                      <div className="driver-vehicle-badge">
+                        {driver.vehicle}
+                      </div>
                     )}
                   </div>
 
@@ -836,7 +1032,9 @@ export default function App() {
                     </div>
                     <div className="stat-chip">
                       <div className="label">Penalties</div>
-                      <div className={`value ${penalties > 0 ? 'penalty' : ''}`}>
+                      <div
+                        className={`value ${penalties > 0 ? 'penalty' : ''}`}
+                      >
                         {completedLaps.length ? penalties : '—'}
                       </div>
                     </div>
@@ -855,34 +1053,41 @@ export default function App() {
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
-                    <button
-                      id={`edit-driver-${driver.id}`}
-                      className="btn-icon"
-                      title="Edit Driver Name"
-                      onClick={() => {
-                        setEditingDriverId(driver.id)
-                        setEditingName(driver.name)
-                      }}
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      id={`delete-driver-${driver.id}`}
-                      className="btn-icon danger"
-                      title="Delete Stint"
-                      onClick={() => deleteDriver(driver.id, driver.name)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                  {!isMarshal && (
+                    <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                      <button
+                        id={`edit-driver-${driver.id}`}
+                        className="btn-icon"
+                        title="Edit Driver Name"
+                        onClick={() => {
+                          setEditingDriverId(driver.id)
+                          setEditingName(driver.name)
+                        }}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        id={`delete-driver-${driver.id}`}
+                        className="btn-icon danger"
+                        title="Delete Stint"
+                        onClick={() => deleteDriver(driver.id, driver.name)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Driver Body — fields */}
                 <div className="driver-body">
                   <div className="driver-fields-row">
                     <div className="driver-field-sm field">
-                      <label className="field-label" htmlFor={`stint-start-${driver.id}`}>Stint Start</label>
+                      <label
+                        className="field-label"
+                        htmlFor={`stint-start-${driver.id}`}
+                      >
+                        Stint Start
+                      </label>
                       <input
                         id={`stint-start-${driver.id}`}
                         type="time"
@@ -893,11 +1098,17 @@ export default function App() {
                             sessionStart: e.target.value,
                           })
                         }
+                        disabled={isMarshal}
                       />
                     </div>
 
                     <div className="driver-field-sm field">
-                      <label className="field-label" htmlFor={`stint-end-${driver.id}`}>Stint End</label>
+                      <label
+                        className="field-label"
+                        htmlFor={`stint-end-${driver.id}`}
+                      >
+                        Stint End
+                      </label>
                       <input
                         id={`stint-end-${driver.id}`}
                         type="time"
@@ -908,11 +1119,17 @@ export default function App() {
                             sessionEnd: e.target.value,
                           })
                         }
+                        disabled={isMarshal}
                       />
                     </div>
 
                     <div className="driver-field-sm field">
-                      <label className="field-label" htmlFor={`vehicle-${driver.id}`}>Vehicle</label>
+                      <label
+                        className="field-label"
+                        htmlFor={`vehicle-${driver.id}`}
+                      >
+                        Vehicle
+                      </label>
                       <select
                         id={`vehicle-${driver.id}`}
                         value={driver.vehicle}
@@ -926,14 +1143,39 @@ export default function App() {
                             vehicle,
                             tires: isCar
                               ? (driver.tires ?? {
-                                  frontRight: { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
-                                  frontLeft:  { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
-                                  rearRight:  { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
-                                  rearLeft:   { coldP: '', coldT: '', hotP: '', hotT: '', depth: '' },
+                                  frontRight: {
+                                    coldP: '',
+                                    coldT: '',
+                                    hotP: '',
+                                    hotT: '',
+                                    depth: '',
+                                  },
+                                  frontLeft: {
+                                    coldP: '',
+                                    coldT: '',
+                                    hotP: '',
+                                    hotT: '',
+                                    depth: '',
+                                  },
+                                  rearRight: {
+                                    coldP: '',
+                                    coldT: '',
+                                    hotP: '',
+                                    hotT: '',
+                                    depth: '',
+                                  },
+                                  rearLeft: {
+                                    coldP: '',
+                                    coldT: '',
+                                    hotP: '',
+                                    hotT: '',
+                                    depth: '',
+                                  },
                                 })
                               : undefined,
                           })
                         }}
+                        disabled={isMarshal}
                       >
                         <option value="">Vehicle</option>
                         <option value="KA 100">KA 100</option>
@@ -945,10 +1187,17 @@ export default function App() {
                     </div>
 
                     <div className="driver-field-grow field">
-                      <label className="field-label" htmlFor={`comments-${driver.id}`}>Comments / Notes</label>
+                      <label
+                        className="field-label"
+                        htmlFor={`comments-${driver.id}`}
+                      >
+                        Comments / Notes
+                      </label>
                       <textarea
                         id={`comments-${driver.id}`}
-                        ref={(el) => { textAreaRefs.current[driver.id] = el }}
+                        ref={(el) => {
+                          textAreaRefs.current[driver.id] = el
+                        }}
                         value={driver.comments}
                         onChange={(e) =>
                           updateDriver(driver.id, {
@@ -957,6 +1206,7 @@ export default function App() {
                           })
                         }
                         placeholder="Setup notes, observations…"
+                        disabled={isMarshal}
                       />
                     </div>
                   </div>
@@ -970,6 +1220,7 @@ export default function App() {
                     onDeleteLap={(lapId, index) =>
                       deleteLap(driver.id, lapId, index)
                     }
+                    isMarshal={isMarshal}
                   />
                 </div>
 
@@ -996,38 +1247,41 @@ export default function App() {
 
                   <div style={{ flex: 1 }} />
 
-                  {!timerActive ? (
-                    <button
-                      id={`start-timer-${driver.id}`}
-                      className="btn btn-start"
-                      onClick={() => startTimer(driver)}
-                    >
-                      Start
-                    </button>
-                  ) : (
-                    <>
+                  {!isMarshal &&
+                    (!timerActive ? (
                       <button
-                        id={`lap-timer-${driver.id}`}
-                        className="btn btn-lap"
-                        onClick={() => recordLap(driver)}
+                        id={`start-timer-${driver.id}`}
+                        className="btn btn-start"
+                        onClick={() => startTimer(driver)}
                       >
-                        Lap
+                        Start
                       </button>
-                      <button
-                        id={`stop-timer-${driver.id}`}
-                        className="btn btn-stop"
-                        onClick={() => stopTimer(driver.id)}
-                      >
-                        Stop
-                      </button>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <button
+                          id={`lap-timer-${driver.id}`}
+                          className="btn btn-lap"
+                          onClick={() => recordLap(driver)}
+                        >
+                          Lap
+                        </button>
+                        <button
+                          id={`stop-timer-${driver.id}`}
+                          className="btn btn-stop"
+                          onClick={() => stopTimer(driver.id)}
+                        >
+                          Stop
+                        </button>
+                      </>
+                    ))}
                 </div>
 
                 {/* Tire Data */}
                 {driver.tires && (
                   <div className="tire-section">
-                    <div className="tire-section-title">Tire Data — {driver.name}</div>
+                    <div className="tire-section-title">
+                      Tire Data — {driver.name}
+                    </div>
                     <table className="tire-table">
                       <thead>
                         <tr>
@@ -1043,18 +1297,25 @@ export default function App() {
                         {(
                           [
                             { key: 'frontRight', label: 'Front Right' },
-                            { key: 'frontLeft',  label: 'Front Left'  },
-                            { key: 'rearRight',  label: 'Rear Right'  },
-                            { key: 'rearLeft',   label: 'Rear Left'   },
+                            { key: 'frontLeft', label: 'Front Left' },
+                            { key: 'rearRight', label: 'Rear Right' },
+                            { key: 'rearLeft', label: 'Rear Left' },
                           ] as const
                         ).map(({ key, label }) => {
-                          const tire = driver.tires![key as keyof typeof driver.tires]!
+                          const tire =
+                            driver.tires![key as keyof typeof driver.tires]!
 
                           return (
                             <tr key={key}>
                               <td className="tire-label">{label}</td>
                               {(
-                                ['coldP', 'coldT', 'hotP', 'hotT', 'depth'] as const
+                                [
+                                  'coldP',
+                                  'coldT',
+                                  'hotP',
+                                  'hotT',
+                                  'depth',
+                                ] as const
                               ).map((field) => (
                                 <td key={field}>
                                   <input
@@ -1103,44 +1364,66 @@ export default function App() {
               ) : (
                 <div className="track-placeholder">
                   <span className="track-placeholder-icon">🗺️</span>
-                  <span className="track-placeholder-text">No layout uploaded</span>
+                  <span className="track-placeholder-text">
+                    No layout uploaded
+                  </span>
                 </div>
               )}
             </div>
 
             <div className="track-card-footer">
-              <label className="file-upload-label" htmlFor="track-image-upload">
-                <Upload size={14} />
-                {trackImage ? 'Replace Image' : 'Upload Layout'}
-              </label>
-              <input
-                id="track-image-upload"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
+              {!isMarshal && (
+                <>
+                  <label
+                    className="file-upload-label"
+                    htmlFor="track-image-upload"
+                  >
+                    <Upload size={14} />
+                    {trackImage ? 'Replace Image' : 'Upload Layout'}
+                  </label>
+                  <input
+                    id="track-image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
 
-                  const reader = new FileReader()
-                  reader.onload = () => {
-                    setTrackImage(reader.result as string)
-                  }
-                  reader.readAsDataURL(file)
-                }}
-              />
+                      const reader = new FileReader()
+                      reader.onload = () => {
+                        const img = reader.result as string
+                        setTrackImage(img)
+                        session.updateTrackImage(img)
+                      }
+                      reader.readAsDataURL(file)
+                    }}
+                  />
+                </>
+              )}
             </div>
           </div>
 
           {/* ── Leaderboard ── */}
           {(() => {
-            type LBEntry = { name: string; vehicle: string; time: number; lapIndex: number }
+            type LBEntry = {
+              name: string
+              vehicle: string
+              time: number
+              lapIndex: number
+            }
             const entries: LBEntry[] = []
             drivers.forEach((driver) => {
               driver.laps
                 .filter((l) => !l.isLive)
                 .forEach((lap, i) => {
                   const t = getFinalTime(lap)
-                  if (t != null) entries.push({ name: driver.name, vehicle: driver.vehicle, time: t, lapIndex: i + 1 })
+                  if (t != null)
+                    entries.push({
+                      name: driver.name,
+                      vehicle: driver.vehicle,
+                      time: t,
+                      lapIndex: i + 1,
+                    })
                 })
             })
             const top = entries.sort((a, b) => a.time - b.time).slice(0, 10)
@@ -1149,7 +1432,10 @@ export default function App() {
             return (
               <div className="leaderboard-card">
                 <div className="leaderboard-header">
-                  <Trophy size={13} style={{ color: 'var(--orange-light)', flexShrink: 0 }} />
+                  <Trophy
+                    size={13}
+                    style={{ color: 'var(--orange-light)', flexShrink: 0 }}
+                  />
                   <span className="leaderboard-title">Session Leaderboard</span>
                 </div>
 
@@ -1168,29 +1454,43 @@ export default function App() {
                     <tbody>
                       {top.map((entry, rank) => {
                         const isFirst = rank === 0
-                        const delta = fastest != null && rank > 0
-                          ? `+${(entry.time - fastest).toFixed(2)}s`
-                          : null
+                        const delta =
+                          fastest != null && rank > 0
+                            ? `+${(entry.time - fastest).toFixed(2)}s`
+                            : null
                         return (
-                          <tr key={rank} className={isFirst ? 'lb-row-gold' : ''}>
+                          <tr
+                            key={rank}
+                            className={isFirst ? 'lb-row-gold' : ''}
+                          >
                             <td className="lb-rank">
                               {rank === 0 ? (
-                                <span className="lb-rank-badge lb-rank-gold">1</span>
+                                <span className="lb-rank-badge lb-rank-gold">
+                                  1
+                                </span>
                               ) : rank === 1 ? (
-                                <span className="lb-rank-badge lb-rank-silver">2</span>
+                                <span className="lb-rank-badge lb-rank-silver">
+                                  2
+                                </span>
                               ) : rank === 2 ? (
-                                <span className="lb-rank-badge lb-rank-bronze">3</span>
+                                <span className="lb-rank-badge lb-rank-bronze">
+                                  3
+                                </span>
                               ) : (
                                 <span className="lb-rank-num">{rank + 1}</span>
                               )}
                             </td>
                             <td className="lb-name">{entry.name}</td>
-                            <td className="lb-vehicle">{entry.vehicle || '—'}</td>
+                            <td className="lb-vehicle">
+                              {entry.vehicle || '—'}
+                            </td>
                             <td className="lb-time">
                               <span className={isFirst ? 'lb-time-gold' : ''}>
                                 {entry.time.toFixed(2)}s
                               </span>
-                              {delta && <span className="lb-delta">{delta}</span>}
+                              {delta && (
+                                <span className="lb-delta">{delta}</span>
+                              )}
                             </td>
                           </tr>
                         )
@@ -1205,7 +1505,10 @@ export default function App() {
           {/* ── Session Averages ── */}
           {(() => {
             // Group all completed laps by driver name across multiple stints
-            const driverMap: Record<string, { vehicle: string; times: number[] }> = {}
+            const driverMap: Record<
+              string,
+              { vehicle: string; times: number[] }
+            > = {}
             drivers.forEach((driver) => {
               const completedLaps = driver.laps.filter((l) => !l.isLive)
               const times = completedLaps
@@ -1221,9 +1524,13 @@ export default function App() {
             const rows = Object.entries(driverMap)
               .map(([name, { times }]) => {
                 const avg = times.reduce((a, b) => a + b, 0) / times.length
-                const stdDev = times.length >= 2
-                  ? Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length)
-                  : null
+                const stdDev =
+                  times.length >= 2
+                    ? Math.sqrt(
+                        times.reduce((s, t) => s + (t - avg) ** 2, 0) /
+                          times.length
+                      )
+                    : null
                 return { name, avg, stdDev, laps: times.length }
               })
               .sort((a, b) => a.avg - b.avg)
@@ -1235,7 +1542,10 @@ export default function App() {
             return (
               <div className="leaderboard-card">
                 <div className="leaderboard-header">
-                  <BarChart2 size={13} style={{ color: 'var(--orange-light)', flexShrink: 0 }} />
+                  <BarChart2
+                    size={13}
+                    style={{ color: 'var(--orange-light)', flexShrink: 0 }}
+                  />
                   <span className="leaderboard-title">Session Averages</span>
                 </div>
                 <table className="leaderboard-table">
@@ -1249,23 +1559,40 @@ export default function App() {
                   </thead>
                   <tbody>
                     {rows.map((row, i) => {
-                      const delta = i > 0 ? `+${(row.avg - fastest).toFixed(2)}s` : null
+                      const delta =
+                        i > 0 ? `+${(row.avg - fastest).toFixed(2)}s` : null
                       return (
-                        <tr key={row.name} className={i === 0 ? 'lb-row-gold' : ''}>
+                        <tr
+                          key={row.name}
+                          className={i === 0 ? 'lb-row-gold' : ''}
+                        >
                           <td className="lb-rank">
                             {i === 0 ? (
-                              <span className="lb-rank-badge lb-rank-gold">1</span>
+                              <span className="lb-rank-badge lb-rank-gold">
+                                1
+                              </span>
                             ) : i === 1 ? (
-                              <span className="lb-rank-badge lb-rank-silver">2</span>
+                              <span className="lb-rank-badge lb-rank-silver">
+                                2
+                              </span>
                             ) : i === 2 ? (
-                              <span className="lb-rank-badge lb-rank-bronze">3</span>
+                              <span className="lb-rank-badge lb-rank-bronze">
+                                3
+                              </span>
                             ) : (
                               <span className="lb-rank-num">{i + 1}</span>
                             )}
                           </td>
                           <td className="lb-name">
                             {row.name}
-                            <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                            <span
+                              style={{
+                                display: 'block',
+                                fontSize: '0.68rem',
+                                color: 'var(--text-muted)',
+                                fontWeight: 400,
+                              }}
+                            >
                               {row.laps} lap{row.laps !== 1 ? 's' : ''}
                             </span>
                           </td>
@@ -1277,7 +1604,9 @@ export default function App() {
                           </td>
                           <td className="lb-time">
                             <span style={{ color: 'var(--text-secondary)' }}>
-                              {row.stdDev != null ? `±${row.stdDev.toFixed(2)}s` : '—'}
+                              {row.stdDev != null
+                                ? `±${row.stdDev.toFixed(2)}s`
+                                : '—'}
                             </span>
                           </td>
                         </tr>

@@ -1,12 +1,9 @@
 # Longhorn Racing Drive Day Log
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Deployed](https://img.shields.io/badge/deployed-vercel-black)
-![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 
-A web-based logging tool for Longhorn Racing drive days.
-
-Used by Trackside Engineering to record driver performance, lap times, penalties, and session conditions.
-
+A web-based tool for recording and analyzing drive day performance, now with **live multi-user sessions and role-based access control**.
 
 
 ## 🌐 Official Tool
@@ -16,8 +13,8 @@ https://driveday.lhre.org
 
 
 ## 📸 Preview
-![Preview](./public/preview_metadata.png)
-![Preview](./public/preview_timer.png)
+![Preview](./public/preview_metadata2.png)
+![Preview](./public/preview_timer2.png)
 
 
 ## 🎯 Purpose
@@ -64,16 +61,20 @@ $$Final Time = baseTime + (2 \times cones) + (20 \times offtrack)$$
 
 
 ## ⚠️ Data Storage
-- Stored in browser (LocalStorage)
-- Clearing browser data will erase session
-- Not synced across devices (yet)
+- Data is now stored in Firebase (cloud)
+- Sessions are shared across devices in real-time
+- Internet connection required
 
 
-## 🛠️ Tech Stack
-- React + TypeScript
-- Vite
-- LocalStorage
-- Vercel (deployment)
+## 🏗️ Architecture
+- Frontend: React + TypeScript (Vite)
+- Backend: Firebase Firestore (real-time database)
+- Deployment: Vercel
+
+The system uses a session-based architecture where:
+- A host creates a session
+- Others join via code
+- All updates sync instantly via Firestore listeners
 
 
 ## 📜 Changelog
@@ -85,4 +86,4 @@ Nathan Yee (Trackside Engineering)
 
 
 ## 📦 Version
-Current version: 1.3.0
+Current version: 2.0.0

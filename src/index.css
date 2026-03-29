@@ -1353,3 +1353,169 @@ input[type="file"] {
   margin-top: 1px;
 }
 
+/* =========================================
+   SESSION GATE
+   ========================================= */
+.session-gate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  padding: 24px;
+}
+
+.session-gate-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.session-gate-brand {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.session-gate-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.session-gate-sub {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--orange-light);
+  text-transform: uppercase;
+}
+
+.session-gate-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 8px 0;
+}
+
+.session-gate-create {
+  width: 100%;
+  justify-content: center;
+  padding: 14px;
+  font-size: 0.92rem;
+  gap: 8px;
+}
+
+.session-gate-or {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  position: relative;
+}
+
+.session-gate-join-row {
+  display: flex;
+  gap: 8px;
+}
+
+.session-code-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+  background: var(--bg-input);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  transition: border-color 0.15s;
+}
+
+.session-code-input:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+.session-gate-error {
+  font-size: 0.78rem;
+  color: var(--red, #ef4444);
+  text-align: center;
+}
+
+/* =========================================
+   SESSION CODE BADGE (header)
+   ========================================= */
+.session-code-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: var(--orange-dim);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--orange-light);
+  cursor: default;
+  user-select: all;
+}
+
+/* =========================================
+   ROLE BADGE
+   ========================================= */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  cursor: default;
+  user-select: none;
+}
+
+/* Marshal (green) */
+.role-badge.marshal {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #22c55e;
+}
+
+/* Admin (red) */
+.role-badge.admin {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+/* =========================================
+   UTILITY
+   ========================================= */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+

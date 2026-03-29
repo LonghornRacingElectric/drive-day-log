@@ -7,6 +7,51 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [2.0.0] - 2026-03-29
+
+### 🚀 Major Release — Real-Time Sessions
+
+### Added
+- Real-time session syncing using Firebase Firestore
+- Session-based architecture with 6-character join codes
+- Multi-user support across devices
+- Role system:
+  - Admin (full control)
+  - Marshal (cones + off-track only)
+- SessionGate UI for creating/joining sessions
+- Session code sharing + copy-to-clipboard
+- Role badge (Admin / Marshal)
+- PDF export button for formatted run sheets
+
+### Improved
+- Complete frontend redesign (layout, cards, spacing, hierarchy)
+- Driver stats:
+  - Best time
+  - Average time
+  - Total penalties
+  - Penalties per lap
+  - Consistency (standard deviation)
+- Session leaderboard (top laps)
+- Session averages (cross-stint analysis)
+- Confirmation modals:
+  - Delete lap
+  - Delete driver
+  - Reset session
+- Track layout upload synced across users
+
+### Changed
+- Data storage moved from localStorage → Firebase (cloud-based)
+- Session is now shared across devices instead of local-only
+
+### Fixed
+- Sync inconsistencies between clients
+- UI issues with previous print/export flow
+
+### ⚠️ Breaking Changes
+- Sessions are no longer stored locally
+- Requires internet connection for real-time sync
+
+
 ## [1.3.0] - 2026-03-29
 
 ### Added

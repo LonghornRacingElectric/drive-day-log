@@ -1,0 +1,45 @@
+# ============================================================
+# Drive Day Log — Dependency Reference
+# ============================================================
+# This is a Node.js / React / TypeScript project.
+# There is no requirements.txt (that is Python).
+# The canonical dependency file is package.json.
+#
+# To install all dependencies:
+#   npm install
+#
+# To run the dev server:
+#   npm run dev
+#
+# To build for production:
+#   npm run build
+# ============================================================
+
+# ── Runtime Dependencies ────────────────────────────────────
+
+react@^19.2.0                  # UI framework
+react-dom@^19.2.0              # DOM renderer for React
+lucide-react@^0.575.0          # Icon library
+jspdf@^4.1.0                   # PDF generation (Export Run Sheet)
+html-to-image@^1.11.13         # (available, unused — kept for future use)
+
+# ── Dev / Build Dependencies ────────────────────────────────
+
+typescript@~5.9.3              # Type checking
+vite@^7.2.4                    # Build tool & dev server
+@vitejs/plugin-react@^5.1.1    # React support for Vite
+@types/react@^19.2.5           # TypeScript types for React
+@types/react-dom@^19.2.3       # TypeScript types for React DOM
+@types/node@^24.10.1           # TypeScript types for Node.js
+eslint@^9.39.1                 # Linting
+@eslint/js@^9.39.1             # ESLint JS rules
+eslint-plugin-react-hooks@^7.0.1      # React hooks lint rules
+eslint-plugin-react-refresh@^0.4.24   # Fast refresh lint rules
+typescript-eslint@^8.46.4      # TypeScript ESLint support
+globals@^16.5.0                # Global variable definitions for ESLint
+prettier@^3.8.1                # Code formatting
+
+# ── Runtime Environment ─────────────────────────────────────
+
+node>=18.0.0                   # Minimum Node.js version required
+npm>=9.0.0                     # Minimum npm version required
