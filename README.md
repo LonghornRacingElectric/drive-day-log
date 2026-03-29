@@ -33,20 +33,20 @@ https://driveday.lhre.org
 - Print to PDF export
 
 
-## 🧠 Timing Logic
-- If one lap is entered, used directly
-- If two laps are entered, average is used
-- Penalties are applied after base time calculation
-
-$$Final Time = baseTime + (2 * cones) + (20 * offtrack)$$
-
-
 ## 🏁 Drive Day Workflow
 1. Add drivers
 2. Record laps (live or manual)
 3. Input penalties during laps
 4. Fill in session metadata
 5. Export
+
+
+## 🧠 Timing Logic
+- If one lap is entered, used directly
+- If two laps are entered, average is used
+- Penalties are applied after base time calculation
+
+$$Final Time = baseTime + (2 * cones) + (20 * offtrack)$$
 
 
 ## ⚠️ Data Storage
@@ -64,3 +64,6 @@ $$Final Time = baseTime + (2 * cones) + (20 * offtrack)$$
 
 ## 👥 Maintainers
 - Nathan Yee (Trackside Engineering)
+
+## 📦 Version
+Current version: 1.0.0
