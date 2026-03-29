@@ -75,7 +75,7 @@ export default function SessionGate({ onCreate, onJoin }: Props) {
         <div className="session-gate-join-row">
           <input
             className="session-code-input"
-            placeholder="Session code (e.g. AB3X7K)"
+            placeholder="(e.g. CPBONER)"
             value={joinCode}
             maxLength={6}
             onChange={(e) => {

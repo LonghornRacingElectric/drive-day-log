@@ -1427,6 +1427,16 @@ input[type="file"] {
 .session-gate-join-row {
   display: flex;
   gap: 8px;
+  width: 100%;        /* KEY: match full width */
+}
+
+.session-code-input {
+  flex: 1;            /* takes remaining space */
+  min-width: 0;       /* prevents overflow */
+}
+
+.session-gate-join-row .btn {
+  flex-shrink: 0;     /* keeps button size stable */
 }
 
 .session-code-input {
