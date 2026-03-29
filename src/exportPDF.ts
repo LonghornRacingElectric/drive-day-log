@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 import type { Driver, SessionMetadata } from './types/driveDay'
-import { getFinalTime, getBestTime, getAverageTime } from './calculations'
+import { getFinalTime, getBestTime, getAverageTime, getTotalPenalties, getPenaltiesPerLap, getStdDev } from './calculations'
 
 // ── Color palette ──────────────────────────────────────────────────────────
 const C = {
@@ -16,6 +16,7 @@ const C = {
   border:    [40,  45,  58]  as [number,number,number],
   white:     [255, 255, 255] as [number,number,number],
   red:       [239, 68,  68]  as [number,number,number],
+  yellow:    [245, 158, 11]  as [number,number,number],
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -297,8 +298,11 @@ export function exportDriveDayPDF(
   // ══════════════════════════════════════════════════════════════════════════
   drivers.forEach((driver, di) => {
     const completedLaps = driver.laps.filter((l) => !l.isLive)
-    const best = getBestTime(completedLaps)
-    const avg  = getAverageTime(completedLaps)
+    const best       = getBestTime(completedLaps)
+    const avg        = getAverageTime(completedLaps)
+    const penalties  = getTotalPenalties(completedLaps)
+    const penPerLap  = getPenaltiesPerLap(completedLaps)
+    const stdDev     = getStdDev(completedLaps)
 
     // Estimate space needed: header + fields + laps + (optional tires)
     const lapH    = completedLaps.length * 8 + 28
@@ -337,25 +341,39 @@ export function exportDriveDayPDF(
       doc.text(driver.vehicle.toUpperCase(), ML + 23, y + 17)
     }
 
-    // Stats on the right
-    const stats: [string, string][] = [
-      ['BEST',  fmtTime(best)],
-      ['AVG',   fmtTime(avg)],
-      ['LAPS',  String(completedLaps.length)],
+    // Stats on the right — two rows of 3
+    const statsRow1: [string, string, boolean][] = [
+      ['BEST',       fmtTime(best),                            true ],
+      ['AVG',        fmtTime(avg),                             false],
+      ['LAPS',       String(completedLaps.length),             false],
     ]
-    let sx = PW - MR - 16
-    stats.reverse().forEach(([label, val]) => {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(5.5)
-      rgb(doc, C.textMuted)
-      doc.text(label, sx, y + 9, { align: 'center' })
+    const statsRow2: [string, string, boolean][] = [
+      ['PENALTIES',  completedLaps.length ? String(penalties) : '—',               penalties > 0],
+      ['PEN / LAP',  penPerLap != null ? penPerLap.toFixed(2) : '—',               false],
+      ['CONSISTENCY', stdDev != null ? '+/-' + stdDev.toFixed(2) + 's' : '—',     false],
+    ]
 
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      rgb(doc, label === 'BEST' ? C.green : C.text)
-      doc.text(val, sx, y + 16, { align: 'center' })
-      sx -= 22
-    })
+    const renderStatRow = (
+      row: [string, string, boolean][],
+      rowY: number,
+    ) => {
+      let sx = PW - MR - 16
+      ;[...row].reverse().forEach(([label, val, highlight]) => {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(5)
+        rgb(doc, C.textMuted)
+        doc.text(label, sx, rowY, { align: 'center' })
+
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(8)
+        rgb(doc, highlight && label === 'BEST' ? C.green : highlight ? C.yellow : C.text)
+        doc.text(val, sx, rowY + 5.5, { align: 'center' })
+        sx -= 26
+      })
+    }
+
+    renderStatRow(statsRow1, y + 7)
+    renderStatRow(statsRow2, y + 16)
 
     y += 27
 

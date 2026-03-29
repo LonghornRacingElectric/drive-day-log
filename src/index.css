@@ -98,6 +98,9 @@ body {
   flex: 1.4;
   position: sticky;
   top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* =========================================
@@ -741,6 +744,10 @@ input[type="checkbox"] {
   color: var(--green);
 }
 
+.stat-chip .value.penalty {
+  color: var(--yellow);
+}
+
 .driver-body {
   padding: 16px 20px;
   background: var(--bg-card);
@@ -1195,3 +1202,154 @@ input[type="file"] {
   color: var(--text-secondary);
   user-select: none;
 }
+
+/* =========================================
+   LEADERBOARD
+   ========================================= */
+.leaderboard-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  margin-top: 16px;
+}
+
+.leaderboard-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.leaderboard-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.leaderboard-empty {
+  text-align: center;
+  padding: 24px 20px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.leaderboard-table thead tr {
+  background: var(--bg-surface);
+}
+
+.leaderboard-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.leaderboard-table th:last-child {
+  text-align: center;
+}
+
+.leaderboard-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.leaderboard-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.leaderboard-table tbody tr:hover td {
+  background: var(--bg-elevated);
+}
+
+.lb-row-gold td {
+  background: rgba(191, 87, 0, 0.06);
+}
+.lb-row-gold:hover td {
+  background: rgba(191, 87, 0, 0.1) !important;
+}
+
+.lb-rank {
+  width: 36px;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.lb-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.lb-rank-gold   { background: rgba(212,175,55,0.18); color: #d4af37; border: 1px solid rgba(212,175,55,0.35); }
+.lb-rank-silver { background: rgba(192,192,192,0.15); color: #b0b8c1; border: 1px solid rgba(192,192,192,0.3); }
+.lb-rank-bronze { background: rgba(176,141,87,0.15); color: #b08d57; border: 1px solid rgba(176,141,87,0.3); }
+
+.lb-rank-num {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.lb-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-vehicle {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.lb-time {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.lb-time span {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.lb-time-gold {
+  color: var(--orange-light) !important;
+  font-weight: 700 !important;
+}
+
+.lb-delta {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+

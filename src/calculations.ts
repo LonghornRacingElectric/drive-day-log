@@ -46,3 +46,23 @@ export function getAverageTime(laps: Lap[]): number | null {
     if (!times.length) return null
     return times.reduce((a, b) => a + b, 0) / times.length
 }
+
+export function getTotalPenalties(laps: Lap[]): number {
+    return laps.reduce((sum, l) => sum + l.cones + l.offTrack, 0)
+}
+
+export function getPenaltiesPerLap(laps: Lap[]): number | null {
+    if (!laps.length) return null
+    return getTotalPenalties(laps) / laps.length
+}
+
+export function getStdDev(laps: Lap[]): number | null {
+    const times = laps
+      .map(getFinalTime)
+      .filter((t): t is number => t != null)
+
+    if (times.length < 2) return null
+    const avg = times.reduce((a, b) => a + b, 0) / times.length
+    const variance = times.reduce((sum, t) => sum + (t - avg) ** 2, 0) / times.length
+    return Math.sqrt(variance)
+}

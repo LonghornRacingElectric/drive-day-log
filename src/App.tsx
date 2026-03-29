@@ -2,10 +2,10 @@
 import { useState, useEffect, useRef } from 'react'
 
 // Third party
-import { Trash2, Pencil, Plus, MapPin, RotateCcw, Upload, Flag, Timer, Zap, Download } from 'lucide-react'
+import { Trash2, Pencil, Plus, MapPin, RotateCcw, Upload, Flag, Timer, Zap, Download, Trophy, BarChart2 } from 'lucide-react'
 
 // Internal utilities
-import { getBestTime, getAverageTime } from './calculations'
+import { getBestTime, getAverageTime, getTotalPenalties, getPenaltiesPerLap, getStdDev, getFinalTime } from './calculations'
 import type { Lap } from './calculations'
 
 // Internal components
@@ -180,9 +180,9 @@ export default function App() {
 
   function deleteDriver(driverId: string, driverName: string) {
     openConfirm({
-      title: `Delete ${driverName}?`,
-      message: 'All laps and data for this driver will be permanently removed. This cannot be undone.',
-      confirmLabel: 'Delete Driver',
+      title: `Delete ${driverName}'s Stint?`,
+      message: 'All laps and data for this stint will be permanently removed. This cannot be undone.',
+      confirmLabel: 'Delete Stint',
       onConfirm: () => {
         setDrivers((drivers) => drivers.filter((d) => d.id !== driverId))
       },
@@ -739,16 +739,20 @@ export default function App() {
           {/* Add Driver Row */}
           <div className="add-driver-row section-gap">
             <Plus size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <input
+            <select
               id="new-driver-name"
-              type="text"
-              placeholder="Enter driver name…"
               value={newDriverName}
               onChange={(e) => setNewDriverName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addDriver()
-              }}
-            />
+              style={{ flex: 1 }}
+            >
+              <option value="">Select driver…</option>
+              <option>Viraj Bhalla</option>
+              <option>Andrew Cloran</option>
+              <option>Luke Ballengee</option>
+              <option>Ali Jensen</option>
+              <option>Oliver Belforti</option>
+              <option>Shreyas Vatts</option>
+            </select>
             <button
               id="add-driver-btn"
               className="btn btn-primary"
@@ -761,8 +765,11 @@ export default function App() {
           {/* ── Driver Cards ── */}
           {drivers.map((driver) => {
             const completedLaps = driver.laps.filter((lap) => !lap.isLive)
-            const best = getBestTime(completedLaps)
-            const avg = getAverageTime(completedLaps)
+            const best       = getBestTime(completedLaps)
+            const avg        = getAverageTime(completedLaps)
+            const penalties  = getTotalPenalties(completedLaps)
+            const penPerLap  = getPenaltiesPerLap(completedLaps)
+            const stdDev     = getStdDev(completedLaps)
             const timerActive = isTimerActive(driver.id)
 
             return (
@@ -812,13 +819,13 @@ export default function App() {
                   {/* Stats chips */}
                   <div className="driver-stats">
                     <div className="stat-chip">
-                      <div className="label">Best</div>
+                      <div className="label">Best Time</div>
                       <div className={`value ${best != null ? 'best' : ''}`}>
                         {best != null ? `${best.toFixed(2)}s` : '—'}
                       </div>
                     </div>
                     <div className="stat-chip">
-                      <div className="label">Avg</div>
+                      <div className="label">Avg Time </div>
                       <div className="value">
                         {avg != null ? `${avg.toFixed(2)}s` : '—'}
                       </div>
@@ -826,6 +833,24 @@ export default function App() {
                     <div className="stat-chip">
                       <div className="label">Laps</div>
                       <div className="value">{completedLaps.length}</div>
+                    </div>
+                    <div className="stat-chip">
+                      <div className="label">Penalties</div>
+                      <div className={`value ${penalties > 0 ? 'penalty' : ''}`}>
+                        {completedLaps.length ? penalties : '—'}
+                      </div>
+                    </div>
+                    <div className="stat-chip">
+                      <div className="label">Penalties / Lap</div>
+                      <div className="value">
+                        {penPerLap != null ? penPerLap.toFixed(2) : '—'}
+                      </div>
+                    </div>
+                    <div className="stat-chip">
+                      <div className="label">Consistency</div>
+                      <div className="value">
+                        {stdDev != null ? `±${stdDev.toFixed(2)}s` : '—'}
+                      </div>
                     </div>
                   </div>
 
@@ -845,7 +870,7 @@ export default function App() {
                     <button
                       id={`delete-driver-${driver.id}`}
                       className="btn-icon danger"
-                      title="Delete Driver"
+                      title="Delete Stint"
                       onClick={() => deleteDriver(driver.id, driver.name)}
                     >
                       <Trash2 size={15} />
@@ -1105,6 +1130,164 @@ export default function App() {
               />
             </div>
           </div>
+
+          {/* ── Leaderboard ── */}
+          {(() => {
+            type LBEntry = { name: string; vehicle: string; time: number; lapIndex: number }
+            const entries: LBEntry[] = []
+            drivers.forEach((driver) => {
+              driver.laps
+                .filter((l) => !l.isLive)
+                .forEach((lap, i) => {
+                  const t = getFinalTime(lap)
+                  if (t != null) entries.push({ name: driver.name, vehicle: driver.vehicle, time: t, lapIndex: i + 1 })
+                })
+            })
+            const top = entries.sort((a, b) => a.time - b.time).slice(0, 10)
+            const fastest = top[0]?.time ?? null
+
+            return (
+              <div className="leaderboard-card">
+                <div className="leaderboard-header">
+                  <Trophy size={13} style={{ color: 'var(--orange-light)', flexShrink: 0 }} />
+                  <span className="leaderboard-title">Session Leaderboard</span>
+                </div>
+
+                {top.length === 0 ? (
+                  <div className="leaderboard-empty">No laps recorded yet</div>
+                ) : (
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Driver</th>
+                        <th>Vehicle</th>
+                        <th>Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {top.map((entry, rank) => {
+                        const isFirst = rank === 0
+                        const delta = fastest != null && rank > 0
+                          ? `+${(entry.time - fastest).toFixed(2)}s`
+                          : null
+                        return (
+                          <tr key={rank} className={isFirst ? 'lb-row-gold' : ''}>
+                            <td className="lb-rank">
+                              {rank === 0 ? (
+                                <span className="lb-rank-badge lb-rank-gold">1</span>
+                              ) : rank === 1 ? (
+                                <span className="lb-rank-badge lb-rank-silver">2</span>
+                              ) : rank === 2 ? (
+                                <span className="lb-rank-badge lb-rank-bronze">3</span>
+                              ) : (
+                                <span className="lb-rank-num">{rank + 1}</span>
+                              )}
+                            </td>
+                            <td className="lb-name">{entry.name}</td>
+                            <td className="lb-vehicle">{entry.vehicle || '—'}</td>
+                            <td className="lb-time">
+                              <span className={isFirst ? 'lb-time-gold' : ''}>
+                                {entry.time.toFixed(2)}s
+                              </span>
+                              {delta && <span className="lb-delta">{delta}</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ── Session Averages ── */}
+          {(() => {
+            // Group all completed laps by driver name across multiple stints
+            const driverMap: Record<string, { vehicle: string; times: number[] }> = {}
+            drivers.forEach((driver) => {
+              const completedLaps = driver.laps.filter((l) => !l.isLive)
+              const times = completedLaps
+                .map((l) => getFinalTime(l))
+                .filter((t): t is number => t != null)
+              if (!times.length) return
+              if (!driverMap[driver.name]) {
+                driverMap[driver.name] = { vehicle: driver.vehicle, times: [] }
+              }
+              driverMap[driver.name].times.push(...times)
+            })
+
+            const rows = Object.entries(driverMap)
+              .map(([name, { times }]) => {
+                const avg = times.reduce((a, b) => a + b, 0) / times.length
+                const stdDev = times.length >= 2
+                  ? Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length)
+                  : null
+                return { name, avg, stdDev, laps: times.length }
+              })
+              .sort((a, b) => a.avg - b.avg)
+
+            if (!rows.length) return null
+
+            const fastest = rows[0].avg
+
+            return (
+              <div className="leaderboard-card">
+                <div className="leaderboard-header">
+                  <BarChart2 size={13} style={{ color: 'var(--orange-light)', flexShrink: 0 }} />
+                  <span className="leaderboard-title">Session Averages</span>
+                </div>
+                <table className="leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Driver</th>
+                      <th style={{ textAlign: 'center' }}>Avg Time</th>
+                      <th style={{ textAlign: 'center' }}>Consistency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, i) => {
+                      const delta = i > 0 ? `+${(row.avg - fastest).toFixed(2)}s` : null
+                      return (
+                        <tr key={row.name} className={i === 0 ? 'lb-row-gold' : ''}>
+                          <td className="lb-rank">
+                            {i === 0 ? (
+                              <span className="lb-rank-badge lb-rank-gold">1</span>
+                            ) : i === 1 ? (
+                              <span className="lb-rank-badge lb-rank-silver">2</span>
+                            ) : i === 2 ? (
+                              <span className="lb-rank-badge lb-rank-bronze">3</span>
+                            ) : (
+                              <span className="lb-rank-num">{i + 1}</span>
+                            )}
+                          </td>
+                          <td className="lb-name">
+                            {row.name}
+                            <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                              {row.laps} lap{row.laps !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                          <td className="lb-time">
+                            <span className={i === 0 ? 'lb-time-gold' : ''}>
+                              {row.avg.toFixed(2)}s
+                            </span>
+                            {delta && <span className="lb-delta">{delta}</span>}
+                          </td>
+                          <td className="lb-time">
+                            <span style={{ color: 'var(--text-secondary)' }}>
+                              {row.stdDev != null ? `±${row.stdDev.toFixed(2)}s` : '—'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </>

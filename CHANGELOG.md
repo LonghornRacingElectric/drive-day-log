@@ -7,6 +7,23 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [1.3.0] - 2026-03-29
+
+### Added
+- Session leaderboard for ranking drivers by performance
+- Session-wide averages for improved comparison across drivers
+- Expanded driver statistics:
+  - Total penalties
+  - Penalties per lap
+  - Consistency (standard deviation of lap times)
+
+### Changed
+- Improved visibility and usefulness of performance metrics
+- Enhanced overall data analysis capabilities within the app
+
+### Fixed
+- Fixed issue with delete driver confirmation modal
+
 ## [1.2.0] - 2026-03-29
 
 ### Added
