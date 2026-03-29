@@ -3,7 +3,9 @@
 - A web-based logging tool for Longhorn Racing drive days.
 - Used by Trackside Engineering to record driver performance, lap times, penalties, and session conditions.
 
-## 🌐 Live App
+## 🌐 Official Tool
+This tool is maintained by Longhorn Racing and is available at:
+
 https://driveday.lhre.org
 
 
