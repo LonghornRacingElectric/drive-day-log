@@ -1069,7 +1069,9 @@ export default function App() {
                 style={{ width: '100%', height: 'auto', display: 'block' }}
               />
             ) : (
-              <span style={{ color: 'gray', padding: 16 }}>No image uploaded</span>
+              <span style={{ color: 'gray', padding: 16 }}>
+                No image uploaded
+              </span>
             )}
           </div>
 
