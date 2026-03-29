@@ -1138,42 +1138,49 @@ export default function App() {
                           const isCar =
                             vehicle === 'Angelique' || vehicle === 'Orion'
 
-                          updateDriver(driver.id, {
-                            ...driver,
+                          const fsDriver = session.drivers.find(
+                            (d) => d.id === driver.id
+                          )
+                          if (!fsDriver) return
+
+                          const updated: Driver = {
+                            ...fsDriver,
                             vehicle,
-                            tires: isCar
-                              ? (driver.tires ?? {
-                                  frontRight: {
-                                    coldP: '',
-                                    coldT: '',
-                                    hotP: '',
-                                    hotT: '',
-                                    depth: '',
-                                  },
-                                  frontLeft: {
-                                    coldP: '',
-                                    coldT: '',
-                                    hotP: '',
-                                    hotT: '',
-                                    depth: '',
-                                  },
-                                  rearRight: {
-                                    coldP: '',
-                                    coldT: '',
-                                    hotP: '',
-                                    hotT: '',
-                                    depth: '',
-                                  },
-                                  rearLeft: {
-                                    coldP: '',
-                                    coldT: '',
-                                    hotP: '',
-                                    hotT: '',
-                                    depth: '',
-                                  },
-                                })
-                              : undefined,
-                          })
+                            ...(isCar && {
+                              tires: fsDriver.tires ?? {
+                                frontRight: {
+                                  coldP: '',
+                                  coldT: '',
+                                  hotP: '',
+                                  hotT: '',
+                                  depth: '',
+                                },
+                                frontLeft: {
+                                  coldP: '',
+                                  coldT: '',
+                                  hotP: '',
+                                  hotT: '',
+                                  depth: '',
+                                },
+                                rearRight: {
+                                  coldP: '',
+                                  coldT: '',
+                                  hotP: '',
+                                  hotT: '',
+                                  depth: '',
+                                },
+                                rearLeft: {
+                                  coldP: '',
+                                  coldT: '',
+                                  hotP: '',
+                                  hotT: '',
+                                  depth: '',
+                                },
+                              },
+                            }),
+                          }
+
+                          updateDriver(driver.id, updated)
                         }}
                         disabled={isMarshal}
                       >
