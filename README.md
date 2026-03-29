@@ -1,7 +1,7 @@
 # Longhorn Racing Drive Day Log
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Deployed](https://img.shields.io/badge/deployed-vercel-black)
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 
 A web-based logging tool for Longhorn Racing drive days.
 
@@ -41,7 +41,7 @@ https://driveday.lhre.org
 - State of Charge (SOC) tracking
 - Track image upload
 - Local persistence
-- Print to PDF export
+- Export run sheet as formatted PDF for sharing and archiving
 
 
 ## 🏁 Drive Day Workflow
@@ -82,4 +82,4 @@ Nathan Yee (Trackside Engineering)
 
 
 ## 📦 Version
-Current version: 1.1.0
+Current version: 1.2.0

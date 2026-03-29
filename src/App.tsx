@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 // Third party
-import { Trash2, Pencil, Plus, MapPin, RotateCcw, Upload, Flag, Timer, Zap } from 'lucide-react'
+import { Trash2, Pencil, Plus, MapPin, RotateCcw, Upload, Flag, Timer, Zap, Download } from 'lucide-react'
 
 // Internal utilities
 import { getBestTime, getAverageTime } from './calculations'
@@ -14,6 +14,7 @@ import ConfirmModal from './components/ConfirmModal'
 
 // Internal types
 import type { Driver, SOCData, SessionMetadata } from './types/driveDay'
+import { exportDriveDayPDF } from './exportPDF'
 
 export default function App() {
   const [drivers, setDrivers] = useState<Driver[]>(() => {
@@ -444,14 +445,26 @@ export default function App() {
             />
           </div>
 
-          <button
-            id="reset-session-btn"
-            className="btn btn-danger"
-            onClick={resetSession}
-          >
-            <RotateCcw size={14} />
-            Reset Session
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              id="export-pdf-btn"
+              className="btn btn-ghost"
+              onClick={() => exportDriveDayPDF(sessionMeta, drivers)}
+              title="Export drive day report as PDF"
+            >
+              <Download size={14} />
+              Export
+            </button>
+
+            <button
+              id="reset-session-btn"
+              className="btn btn-danger"
+              onClick={resetSession}
+            >
+              <RotateCcw size={14} />
+              Reset Session
+            </button>
+          </div>
         </div>
       </header>
 

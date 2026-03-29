@@ -7,6 +7,18 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [1.2.0] - 2026-03-29
+
+### Added
+- Export Run Sheet feature
+  - Generates a clean, formatted PDF
+  - Includes session metadata, driver data, and lap tables
+  - Optimized for sharing via Slack and SharePoint
+
+### Changed
+- Improved workflow for post-session data sharing
+
+
 ## [1.1.0] - 2026-03-29
 
 ### Added
