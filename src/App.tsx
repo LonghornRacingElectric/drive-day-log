@@ -1054,23 +1054,22 @@ export default function App() {
           <div
             style={{
               width: '100%',
-              aspectRatio: '1 / 1',
               border: '1px dashed gray',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 12,
-              overflow: 'hidden',
+              minHeight: 80,
             }}
           >
             {trackImage ? (
               <img
                 src={trackImage}
                 alt="Track"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ width: '100%', height: 'auto', display: 'block' }}
               />
             ) : (
-              <span style={{ color: 'gray' }}>No image uploaded</span>
+              <span style={{ color: 'gray', padding: 16 }}>No image uploaded</span>
             )}
           </div>
 
