@@ -60,3 +60,7 @@ $$Final Time = baseTime + (2 * cones) + (20 * offtrack)$$
 - Vite
 - Local Storage
 - Vercel (deployment)
+
+
+## 👥 Maintainers
+- Nathan Yee (Trackside Engineering)
