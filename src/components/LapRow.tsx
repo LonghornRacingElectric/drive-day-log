@@ -8,7 +8,6 @@ type Props = {
   activeElapsed: number
   onChange: (updated: Lap) => void
   onDelete: () => void
-  isMarshal: boolean
 }
 
 export default function LapRow({
@@ -17,7 +16,6 @@ export default function LapRow({
   activeElapsed,
   onChange,
   onDelete,
-  isMarshal,
 }: Props) {
   const [isHovering, setIsHovering] = useState(false)
 

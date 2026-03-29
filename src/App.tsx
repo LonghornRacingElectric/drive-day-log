@@ -1220,7 +1220,6 @@ export default function App() {
                     onDeleteLap={(lapId, index) =>
                       deleteLap(driver.id, lapId, index)
                     }
-                    isMarshal={isMarshal}
                   />
                 </div>
 

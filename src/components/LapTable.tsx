@@ -8,7 +8,6 @@ type Props = {
   activeElapsed: number
   onUpdateLap: (lap: Lap) => void
   onDeleteLap: (lapId: string, index: number) => void
-  isMarshal: boolean
 }
 
 export default function LapTable({
@@ -17,7 +16,6 @@ export default function LapTable({
   activeElapsed,
   onUpdateLap,
   onDeleteLap,
-  isMarshal,
 }: Props) {
   if (!laps.length)
     return (
@@ -54,7 +52,6 @@ export default function LapTable({
                   activeElapsed={activeElapsed}
                   onChange={onUpdateLap}
                   onDelete={() => onDeleteLap(lap.id, index)}
-                  isMarshal={isMarshal}
                 />
 
                 <td>
