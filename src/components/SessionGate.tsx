@@ -68,7 +68,7 @@ export default function SessionGate({ onCreate, onJoin }: Props) {
         </button>
 
         <div className="session-gate-or">
-          <span>or join existing</span>
+          <span>or join existing with code</span>
         </div>
 
         {/* Join existing session */}
