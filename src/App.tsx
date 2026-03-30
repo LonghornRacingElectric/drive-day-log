@@ -459,6 +459,98 @@ export default function App() {
     )
   }
 
+  if (isMarshal) {
+    return (
+      <>
+        <header className="app-header">
+        <div className="header-inner">
+          <div className="header-brand">
+            <img
+              src="/lhr_logo.png"
+              alt="Longhorn Racing"
+              style={{
+                height: 44,
+                width: 'auto',
+                filter: 'brightness(0) invert(1)',
+              }}
+            />
+            <div className="header-titles">
+              <h1>Drive Day Log</h1>
+              <div className="subtitle">Longhorn Racing Electric</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Role badge */}
+            <div
+              className={`role-badge ${isMarshal ? 'marshal' : 'admin'}`}
+              title="User role"
+            >
+              {isMarshal ? 'MARSHAL' : 'ADMIN'}
+            </div>
+
+            {/* Session code badge */}
+            <div
+              className="session-code-badge"
+              title="Click to copy session code"
+              onClick={() => {
+                if (session.sessionCode) {
+                  navigator.clipboard.writeText(session.sessionCode)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1000)
+                }
+              }}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+            >
+              <span
+                style={{
+                  minWidth: '6ch',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                }}
+              >
+                {copied ? 'COPIED' : session.sessionCode}
+              </span>
+            </div>
+
+            <button
+              id="leave-session-btn"
+              className="btn btn-ghost"
+              onClick={session.leaveSession}
+              title="Leave session"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+        <div className="main-panel" style={{ padding: 12 }}>
+          {session.drivers.map((driver) => {
+            const completedLaps = driver.laps.filter((l) => !l.isLive)
+            const best = getBestTime(completedLaps)
+
+            return (
+              <div key={driver.id} className="driver-card">
+                <div className="driver-header">
+                  <div className="driver-name">{driver.name}</div>
+                </div>
+
+                <LapTable
+                  laps={driver.laps}
+                  bestTime={best}
+                  activeElapsed={activeTimers[driver.id]?.elapsed ?? 0}
+                  onUpdateLap={(lap) => updateLap(driver.id, lap)}
+                  onDeleteLap={() => {}}
+                />
+              </div>
+            )
+          })}
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       {/* ── Confirm Modal ── */}

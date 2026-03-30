@@ -7,9 +7,23 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [2.1.0] - 2026-03-30
+
+### Marshal View Update
+
+### Added
+- Mobile-optimized marshal interface
+- Role-based UI (marshal vs admin)
+
+### Improvements
+- Streamlined marshal view to only show driver laps and penalties
+- Removed unnecessary panels (track map, leaderboard, metadata)
+- Faster and more usable for live drive day logging
+
+
 ## [2.0.0] - 2026-03-29
 
-### 🚀 Major Release — Real-Time Sessions
+### Major Release — Real-Time Sessions
 
 ### Added
 - Real-time session syncing using Firebase Firestore
@@ -47,7 +61,7 @@ and this project follows Semantic Versioning.
 - Sync inconsistencies between clients
 - UI issues with previous print/export flow
 
-### ⚠️ Breaking Changes
+###  Breaking Changes
 - Sessions are no longer stored locally
 - Requires internet connection for real-time sync
 
@@ -113,12 +127,3 @@ and this project follows Semantic Versioning.
 - Print to PDF export
 - Deployment via Vercel
 
----
-
-## [Unreleased]
-
-### Added
-
-### Changed
-
-### Fixed
