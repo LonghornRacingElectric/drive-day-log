@@ -657,7 +657,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Row 2: Day Start / Day End / Power Limit / Total Distance */}
+            {/* Row 2: Day Start / Day End / Total Distance */}
             <div
               className="form-grid"
               style={{
@@ -695,33 +695,6 @@ export default function App() {
                   value={sessionMeta.endTime}
                   onChange={(e) =>
                     setSessionMeta({ ...sessionMeta, endTime: e.target.value })
-                  }
-                  disabled={isMarshal}
-                />
-              </div>
-
-              <div className="field">
-                <label className="field-label" htmlFor="power-limit">
-                  <Zap
-                    size={10}
-                    style={{
-                      display: 'inline',
-                      marginRight: 3,
-                      verticalAlign: 'middle',
-                    }}
-                  />
-                  Power Limit
-                </label>
-                <input
-                  id="power-limit"
-                  type="text"
-                  placeholder="e.g. 80 kW"
-                  value={sessionMeta.powerLimit}
-                  onChange={(e) =>
-                    setSessionMeta({
-                      ...sessionMeta,
-                      powerLimit: e.target.value,
-                    })
                   }
                   disabled={isMarshal}
                 />

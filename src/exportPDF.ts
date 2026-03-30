@@ -161,7 +161,6 @@ export function exportDriveDayPDF(
     ['Weather',        fmtOrDash(sessionMeta.weather)],
     ['Day Start',      fmtOrDash(sessionMeta.startTime)],
     ['Day End',        fmtOrDash(sessionMeta.endTime)],
-    ['Power Limit',    fmtOrDash(sessionMeta.powerLimit)],
     ['Total Distance', sessionMeta.totalDistance ? sessionMeta.totalDistance + ' mi' : '—'],
   ]
 

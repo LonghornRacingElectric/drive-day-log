@@ -33,7 +33,7 @@ https://driveday.lhre.org
   - Event type (Skidpad, Autocross, Endurance, Kart)
   - Weather & track conditions
   - Start/end times
-  - Power limit & distance
+  - Total distance
 - Tire data logging
 - State of Charge (SOC) tracking
 - Track image upload
