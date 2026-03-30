@@ -1517,6 +1517,14 @@ input[type="file"] {
   color: #ef4444;
 }
 
+@media (max-width: 600px) {
+  .role-badge {
+    padding: 2px 6px;
+    font-size: 0.6rem;
+    letter-spacing: 0.05em;
+  }
+}
+
 /* =========================================
    UTILITY
    ========================================= */
