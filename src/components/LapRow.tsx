@@ -8,6 +8,7 @@ type Props = {
   activeElapsed: number
   onChange: (updated: Lap) => void
   onDelete: () => void
+  isMarshal: boolean
 }
 
 export default function LapRow({
@@ -16,6 +17,7 @@ export default function LapRow({
   activeElapsed,
   onChange,
   onDelete,
+  isMarshal,
 }: Props) {
   const [isHovering, setIsHovering] = useState(false)
 
@@ -27,14 +29,18 @@ export default function LapRow({
     <>
       <td
         className="lap-num-cell"
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
+        onMouseEnter={() => {
+          if (!isMarshal) setIsHovering(true)
+        }}
+        onMouseLeave={() => {
+          if (!isMarshal) setIsHovering(false)
+        }}
         onClick={() => {
-          if (isHovering) onDelete()
+          if (!isMarshal && isHovering) onDelete()
         }}
         title="Click to delete lap"
       >
-        {isHovering ? (
+        {!isMarshal && isHovering ? (
           <Trash2 size={14} color="var(--red)" />
         ) : (
           <>
@@ -57,39 +63,43 @@ export default function LapRow({
         )}
       </td>
 
-      <td>
-        {lap.isLive ? (
-          <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
-        ) : (
+      {!isMarshal && (
+        <td>
+          {lap.isLive ? (
+            <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
+          ) : (
+            <input
+              type="number"
+              inputMode="decimal"
+              value={lap.time1 ?? ''}
+              onChange={(e) =>
+                update(
+                  'time1',
+                  e.target.value === '' ? null : Number(e.target.value)
+                )
+              }
+              className="lap-time-input"
+            />
+          )}
+        </td>
+      )}
+
+      {!isMarshal && (
+        <td>
           <input
             type="number"
             inputMode="decimal"
-            value={lap.time1 ?? ''}
+            value={lap.time2 ?? ''}
             onChange={(e) =>
               update(
-                'time1',
+                'time2',
                 e.target.value === '' ? null : Number(e.target.value)
               )
             }
             className="lap-time-input"
           />
-        )}
-      </td>
-
-      <td>
-        <input
-          type="number"
-          inputMode="decimal"
-          value={lap.time2 ?? ''}
-          onChange={(e) =>
-            update(
-              'time2',
-              e.target.value === '' ? null : Number(e.target.value)
-            )
-          }
-          className="lap-time-input"
-        />
-      </td>
+        </td>
+      )}
 
       <td>
         <div className="counter-group">

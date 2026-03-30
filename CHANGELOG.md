@@ -7,6 +7,14 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [2.1.1] - 2026-03-30
+
+### Fixes
+- Removed Time 1 and Time 2 columns for Marshal View
+- Removed clutter for header for Marshal View
+- Improved mobile view
+
+
 ## [2.1.0] - 2026-03-30
 
 ### Marshal View Update

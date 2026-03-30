@@ -8,6 +8,7 @@ type Props = {
   activeElapsed: number
   onUpdateLap: (lap: Lap) => void
   onDeleteLap: (lapId: string, index: number) => void
+  isMarshal: boolean
 }
 
 export default function LapTable({
@@ -16,6 +17,7 @@ export default function LapTable({
   activeElapsed,
   onUpdateLap,
   onDeleteLap,
+  isMarshal,
 }: Props) {
   if (!laps.length)
     return (
@@ -30,8 +32,8 @@ export default function LapTable({
         <thead>
           <tr>
             <th style={{ width: 70 }}>Lap</th>
-            <th>Time 1</th>
-            <th>Time 2</th>
+            {!isMarshal && <th>Time 1</th>}
+            {!isMarshal && <th>Time 2</th>}
             <th>Cones Hit</th>
             <th>Off Track</th>
             <th>Final</th>
@@ -52,6 +54,7 @@ export default function LapTable({
                   activeElapsed={activeElapsed}
                   onChange={onUpdateLap}
                   onDelete={() => onDeleteLap(lap.id, index)}
+                  isMarshal={isMarshal}
                 />
 
                 <td>

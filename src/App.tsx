@@ -487,31 +487,7 @@ export default function App() {
               title="User role"
             >
               {isMarshal ? 'MARSHAL' : 'ADMIN'}
-            </div>
-
-            {/* Session code badge */}
-            <div
-              className="session-code-badge"
-              title="Click to copy session code"
-              onClick={() => {
-                if (session.sessionCode) {
-                  navigator.clipboard.writeText(session.sessionCode)
-                  setCopied(true)
-                  setTimeout(() => setCopied(false), 1000)
-                }
-              }}
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-            >
-              <span
-                style={{
-                  minWidth: '6ch',
-                  display: 'inline-block',
-                  textAlign: 'center',
-                }}
-              >
-                {copied ? 'COPIED' : session.sessionCode}
-              </span>
-            </div>
+            </div>            
 
             <button
               id="leave-session-btn"
@@ -542,6 +518,7 @@ export default function App() {
                   activeElapsed={activeTimers[driver.id]?.elapsed ?? 0}
                   onUpdateLap={(lap) => updateLap(driver.id, lap)}
                   onDeleteLap={() => {}}
+                  isMarshal={isMarshal}
                 />
               </div>
             )
@@ -1292,6 +1269,7 @@ export default function App() {
                     onDeleteLap={(lapId, index) =>
                       deleteLap(driver.id, lapId, index)
                     }
+                    isMarshal={isMarshal}
                   />
                 </div>
 

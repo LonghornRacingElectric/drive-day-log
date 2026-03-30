@@ -167,6 +167,7 @@ body {
   color: var(--text-primary);
   letter-spacing: -0.02em;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .header-titles .subtitle {
