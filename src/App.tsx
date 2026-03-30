@@ -480,7 +480,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {/* Role badge */}
             <div
               className={`role-badge ${isMarshal ? 'marshal' : 'admin'}`}

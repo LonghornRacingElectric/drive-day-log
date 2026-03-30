@@ -38,7 +38,11 @@ export default function LapRow({
         onClick={() => {
           if (!isMarshal && isHovering) onDelete()
         }}
-        title="Click to delete lap"
+        title={!isMarshal ? 'Click to delete lap' : undefined}
+        style={{
+          pointerEvents: isMarshal ? 'none' : 'auto',
+          WebkitTapHighlightColor: 'transparent',
+        }}
       >
         {!isMarshal && isHovering ? (
           <Trash2 size={14} color="var(--red)" />
