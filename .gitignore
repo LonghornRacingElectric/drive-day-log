@@ -14,6 +14,13 @@ dist-ssr
 .env.local
 !.env.local.example
 
+# Keys
+*serviceAccountKey.json
+*.pem
+
+# Local instructions
+clean-db-instructions.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/settings.json
