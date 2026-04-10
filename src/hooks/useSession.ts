@@ -140,6 +140,7 @@ export function useSession(): SessionHook {
         meta: defaultMeta,
         trackImage: null,
         createdAt: serverTimestamp(),
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
       })
     } catch (err) {
       // Clean up so the gate doesn't get stuck
@@ -171,7 +172,8 @@ export function useSession(): SessionHook {
 
   // ── Data writes ──────────────────────────────────────────────────────────
   async function addDriver(driver: Driver) {
-    await setDoc(driverRef(driver.id), { ...driver, createdAt: Date.now() })
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
+    await setDoc(driverRef(driver.id), { ...driver, createdAt: Date.now(), expiresAt })
   }
 
   async function updateDriver(driverId: string, updated: Driver) {
