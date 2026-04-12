@@ -47,7 +47,7 @@ export type SessionMetadata = {
         wind: string
         humidity: string
         ambientTemp: string
-        wetTrack: boolean
+        wetTrack: number
         trackTemp: string
     }
 

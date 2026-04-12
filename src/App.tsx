@@ -17,6 +17,8 @@ import {
   BarChart2,
   LogOut,
   Loader2,
+  Sun,
+  Moon,
 } from 'lucide-react'
 
 // Internal utilities
@@ -58,6 +60,18 @@ export default function App() {
 
   // ── Local UI state ────────────────────────────────────────────────────────
   const [newDriverName, setNewDriverName] = useState('')
+  const [isLightMode, setIsLightMode] = useState(() => {
+    return localStorage.getItem('driveDayLightMode') === 'true'
+  })
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.add('light-mode')
+    } else {
+      document.documentElement.classList.remove('light-mode')
+    }
+    localStorage.setItem('driveDayLightMode', String(isLightMode))
+  }, [isLightMode])
 
   // sessionMeta + trackImage — Firestore is the source of truth.
   // We keep local state for smooth editing and sync bidirectionally.
@@ -553,7 +567,7 @@ export default function App() {
               style={{
                 height: 44,
                 width: 'auto',
-                filter: 'brightness(0) invert(1)',
+                filter: isLightMode ? 'brightness(0)' : 'brightness(0) invert(1)',
               }}
             />
             <div className="header-titles">
@@ -578,6 +592,16 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Theme Toggle */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setIsLightMode(!isLightMode)}
+              title="Toggle Light/Dark Mode"
+              style={{ padding: '6px' }}
+            >
+              {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
+
             {/* Role badge */}
             <div
               className={`role-badge ${isMarshal ? 'marshal' : 'admin'}`}
@@ -882,29 +906,30 @@ export default function App() {
               </div>
 
               <div className="field">
-                <label className="field-label">Wet Track</label>
-                <label className="wet-toggle" htmlFor="cond-wet">
+                <label className="field-label">Wet Track (%)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px' }}>
                   <input
                     id="cond-wet"
-                    type="checkbox"
-                    checked={sessionMeta.trackConditions.wetTrack === true}
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={sessionMeta.trackConditions.wetTrack ?? 0}
                     onChange={(e) =>
                       setSessionMeta({
                         ...sessionMeta,
                         trackConditions: {
                           ...sessionMeta.trackConditions,
-                          wetTrack: e.target.checked,
+                          wetTrack: Number(e.target.value),
                         },
                       })
                     }
                     disabled={isMarshal}
+                    style={{ flex: 1, accentColor: 'var(--orange-light)' }}
                   />
-                  <span>
-                    {sessionMeta.trackConditions.wetTrack
-                      ? 'Yes — wet'
-                      : 'No — dry'}
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', minWidth: '40px', fontFamily: 'var(--font-mono)' }}>
+                    {sessionMeta.trackConditions.wetTrack ?? 0}%
                   </span>
-                </label>
+                </div>
               </div>
             </div>
           </div>

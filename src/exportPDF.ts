@@ -200,7 +200,7 @@ export function exportDriveDayPDF(
     ['Humidity',     tc.humidity ? tc.humidity + '%' : '—'],
     ['Ambient Temp', tc.ambientTemp ? tc.ambientTemp + '°F' : '—'],
     ['Track Temp',   tc.trackTemp ? tc.trackTemp + '°F' : '—'],
-    ['Wet Track',    tc.wetTrack ? 'Yes' : 'No'],
+    ['Wet Track',    (tc.wetTrack ?? 0) + '%'],
   ]
 
   const tcCardH = 26
@@ -223,7 +223,7 @@ export function exportDriveDayPDF(
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8.5)
-    rgb(doc, i === 4 && tc.wetTrack ? C.red : C.text)
+    rgb(doc, i === 4 && (tc.wetTrack ?? 0) > 0 ? C.red : C.text)
     doc.text(value, ix, iy + 5.5)
   })
 

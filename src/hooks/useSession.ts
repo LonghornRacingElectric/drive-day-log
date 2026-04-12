@@ -18,7 +18,7 @@ export const defaultMeta: SessionMetadata = {
   date: new Date().toISOString().split('T')[0],
   event: '', weather: '', startTime: '', endTime: '',
   sessionGoals: '', powerLimit: '', totalDistance: '',
-  trackConditions: { wind: '', humidity: '', ambientTemp: '', trackTemp: '', wetTrack: false },
+  trackConditions: { wind: '', humidity: '', ambientTemp: '', trackTemp: '', wetTrack: 0 },
   stateOfCharge: [{ id: crypto.randomUUID(), initialSOC: '', finalSOC: '', initialVolts: '', finalVolts: '' }],
 }
 
