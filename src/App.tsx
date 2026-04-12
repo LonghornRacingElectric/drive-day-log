@@ -57,7 +57,7 @@ export default function App() {
       { startTime: number; elapsed: number; intervalId: number | null }
     >
   >({})
-  const [liveLaps, setLiveLaps] = useState<Record<string, Lap>>({}) // driverId → live Lap
+
   const startRef = useRef<Record<string, number>>({})
 
   // ── Local UI state ────────────────────────────────────────────────────────
@@ -117,21 +117,7 @@ export default function App() {
 
   const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
 
-  // Merge Firestore drivers with local live laps for display
-  const drivers: Driver[] = session.drivers.map((d) => {
-    const liveLap = liveLaps[d.id]
-    if (liveLap) {
-      const elapsed = activeTimers[d.id]?.elapsed ?? 0
-      return {
-        ...d,
-        laps: [
-          ...d.laps,
-          { ...liveLap, time1: parseFloat(elapsed.toFixed(3)) },
-        ],
-      }
-    }
-    return d
-  })
+  const drivers = session.drivers
 
   // ── Firestore ↔ local sync ────────────────────────────────────────────────
 
@@ -239,11 +225,6 @@ export default function App() {
       onConfirm: async () => {
         const t = activeTimers[driverId]
         if (t?.intervalId != null) clearInterval(t.intervalId)
-        setLiveLaps((p) => {
-          const u = { ...p }
-          delete u[driverId]
-          return u
-        })
         setActiveTimers((p) => {
           const u = { ...p }
           delete u[driverId]
@@ -306,7 +287,6 @@ export default function App() {
           if (t.intervalId != null) clearInterval(t.intervalId)
         })
         setActiveTimers({})
-        setLiveLaps({})
         setTrackImage(null)
         setSessionMeta(defaultMeta)
         localStorage.removeItem('trackImage')
@@ -326,7 +306,19 @@ export default function App() {
       offTrack: 0,
       isLive: true,
     }
-    setLiveLaps((prev) => ({ ...prev, [driver.id]: liveLap }))
+    let sessionStart = driver.sessionStart
+    if (!sessionStart || sessionStart.trim() === '') {
+      const now = new Date()
+      const hh = String(now.getHours()).padStart(2, '0')
+      const mm = String(now.getMinutes()).padStart(2, '0')
+      sessionStart = `${hh}:${mm}`
+    }
+
+    session.updateDriver(driver.id, {
+      ...driver,
+      sessionStart,
+      laps: [...driver.laps, liveLap],
+    })
     const intervalId = window.setInterval(() => {
       setActiveTimers((prev) => ({
         ...prev,
@@ -344,20 +336,16 @@ export default function App() {
 
   async function recordLap(driver: Driver) {
     const elapsed = activeTimers[driver.id]?.elapsed ?? 0
-    const liveLap = liveLaps[driver.id]
-    if (!liveLap) return
+    const fsDriver = session.drivers.find((d) => d.id === driver.id)
+    if (!fsDriver) return
+
+    const liveLapIndex = fsDriver.laps.findIndex((l) => l.isLive)
+    if (liveLapIndex === -1) return
 
     const completedLap: Lap = {
-      ...liveLap,
+      ...fsDriver.laps[liveLapIndex],
       time1: parseFloat(elapsed.toFixed(3)),
       isLive: false,
-    }
-    const fsDriver = session.drivers.find((d) => d.id === driver.id)
-    if (fsDriver) {
-      await session.updateDriver(driver.id, {
-        ...fsDriver,
-        laps: [...fsDriver.laps, completedLap],
-      })
     }
 
     const newLiveLap: Lap = {
@@ -368,7 +356,15 @@ export default function App() {
       offTrack: 0,
       isLive: true,
     }
-    setLiveLaps((prev) => ({ ...prev, [driver.id]: newLiveLap }))
+
+    const newLaps = [...fsDriver.laps]
+    newLaps[liveLapIndex] = completedLap
+    newLaps.push(newLiveLap)
+
+    await session.updateDriver(driver.id, {
+      ...fsDriver,
+      laps: newLaps,
+    })
     startRef.current[driver.id] = Date.now()
     setActiveTimers((prev) => ({
       ...prev,
@@ -381,27 +377,24 @@ export default function App() {
     if (!timer) return
     if (timer.intervalId !== null) clearInterval(timer.intervalId)
 
-    const liveLap = liveLaps[driverId]
-    if (liveLap) {
-      const completedLap: Lap = {
-        ...liveLap,
-        time1: parseFloat((timer.elapsed ?? 0).toFixed(3)),
-        isLive: false,
-      }
-      const fsDriver = session.drivers.find((d) => d.id === driverId)
-      if (fsDriver) {
+    const fsDriver = session.drivers.find((d) => d.id === driverId)
+    if (fsDriver) {
+      const liveLapIndex = fsDriver.laps.findIndex((l) => l.isLive)
+      if (liveLapIndex !== -1) {
+        const completedLap: Lap = {
+          ...fsDriver.laps[liveLapIndex],
+          time1: parseFloat((timer.elapsed ?? 0).toFixed(3)),
+          isLive: false,
+        }
+        const newLaps = [...fsDriver.laps]
+        newLaps[liveLapIndex] = completedLap
         await session.updateDriver(driverId, {
           ...fsDriver,
-          laps: [...fsDriver.laps, completedLap],
+          laps: newLaps,
         })
       }
     }
 
-    setLiveLaps((prev) => {
-      const u = { ...prev }
-      delete u[driverId]
-      return u
-    })
     setActiveTimers((prev) => {
       const u = { ...prev }
       delete u[driverId]

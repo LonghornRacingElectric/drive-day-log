@@ -58,7 +58,7 @@ export default function LapTable({
                 />
 
                 <td>
-                  {finalTime != null ? (
+                  {finalTime != null && !lap.isLive ? (
                     <span
                       className={
                         isBest ? 'lap-final-best' : 'lap-final-normal'

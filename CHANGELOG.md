@@ -7,6 +7,17 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [2.2.0] - 2026-04-12
+
+### Improvements
+- Added option to download as XLSX
+- Added auto start time for drivers
+- Update live timing, can add cones and off track during the lap now
+
+### Fixes
+- Adjusted PDF and XLSX export
+- 
+
 ## [2.1.4] - 2026-04-12
 
 ### Improvements

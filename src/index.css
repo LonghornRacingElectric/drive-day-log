@@ -895,6 +895,7 @@ input[type="checkbox"] {
   color: var(--orange-light);
   min-width: 80px;
   display: inline-block;
+  padding-left: 6px;
   animation: pulse-text 1s ease-in-out infinite;
 }
 
