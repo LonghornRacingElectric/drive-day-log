@@ -483,18 +483,48 @@ export default function App() {
               src="/lhr_logo.png"
               alt="Longhorn Racing"
               style={{
-                height: 44,
+                height: 50,
                 width: 'auto',
-                filter: 'brightness(0) invert(1)',
+                filter: isLightMode ? 'brightness(0)' : 'brightness(0) invert(1)',
               }}
             />
-            <div className="header-titles">
-              <h1>Drive Day Log</h1>
-              <div className="subtitle">Longhorn Racing Electric</div>
-            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* Theme Toggle */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setIsLightMode(!isLightMode)}
+              title="Toggle Light/Dark Mode"
+              style={{ padding: '6px' }}
+            >
+              {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
+
+            {/* Session code badge */}
+            <div
+              className="session-code-badge"
+              title="Click to copy session code"
+              onClick={() => {
+                if (session.sessionCode) {
+                  navigator.clipboard.writeText(session.sessionCode)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1000)
+                }
+              }}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+            >
+              <span
+                style={{
+                  minWidth: '6ch',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                }}
+              >
+                {copied ? 'COPIED' : session.sessionCode}
+              </span>
+            </div>
+
             {/* Role badge */}
             <div
               className={`role-badge ${isMarshal ? 'marshal' : 'admin'}`}
@@ -570,26 +600,30 @@ export default function App() {
                 filter: isLightMode ? 'brightness(0)' : 'brightness(0) invert(1)',
               }}
             />
-            <div className="header-titles">
-              <h1>Drive Day Log</h1>
-              <div className="subtitle">Longhorn Racing Electric</div>
-            </div>
+            {!isMarshal && (
+              <div className="header-titles">
+                <h1>Drive Day Log</h1>
+                <div className="subtitle">Longhorn Racing Electric</div>
+              </div>
+            )}
           </div>
 
-          <div className="header-goals">
-            <span className="header-goals-label">Goals</span>
-            <input
-              type="text"
-              id="session-goals"
-              value={sessionMeta.sessionGoals}
-              onChange={(e) =>
-                setSessionMeta({ ...sessionMeta, sessionGoals: e.target.value })
-              }
-              placeholder="Enter session objectives…"
-              style={{ flex: 1 }}
-              disabled={isMarshal}
-            />
-          </div>
+          {!isMarshal && (
+            <div className="header-goals">
+              <span className="header-goals-label">Goals</span>
+              <input
+                type="text"
+                id="session-goals"
+                value={sessionMeta.sessionGoals}
+                onChange={(e) =>
+                  setSessionMeta({ ...sessionMeta, sessionGoals: e.target.value })
+                }
+                placeholder="Enter session objectives…"
+                style={{ flex: 1 }}
+                disabled={isMarshal}
+              />
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* Theme Toggle */}
@@ -634,15 +668,17 @@ export default function App() {
               </span>
             </div>
 
-            <button
-              id="export-pdf-btn"
-              className="btn btn-ghost"
-              onClick={() => exportDriveDayPDF(sessionMeta, drivers)}
-              title="Export drive day report as PDF"
-            >
-              <Download size={14} />
-              Export
-            </button>
+            {!isMarshal && (
+              <button
+                id="export-pdf-btn"
+                className="btn btn-ghost"
+                onClick={() => exportDriveDayPDF(sessionMeta, drivers)}
+                title="Export drive day report as PDF"
+              >
+                <Download size={14} />
+                Export
+              </button>
+            )}
 
             {!isMarshal && (
               <button

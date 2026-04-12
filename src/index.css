@@ -906,19 +906,21 @@ input[type="checkbox"] {
 }
 
 .counter-btn {
-  width: 22px;
-  height: 22px;
+  width: 38px;
+  height: 38px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-mid);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 20px;
   line-height: 1;
   transition: all 0.12s;
+  /* Prevent double-tap zoom on phones */
+  touch-action: manipulation;
 }
 .counter-btn:hover {
   border-color: var(--orange);
@@ -928,10 +930,10 @@ input[type="checkbox"] {
 
 .counter-val {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-primary);
-  min-width: 18px;
+  min-width: 24px;
   text-align: center;
 }
 
@@ -1526,13 +1528,6 @@ input[type="file"] {
   color: #ef4444;
 }
 
-@media (max-width: 600px) {
-  .role-badge {
-    padding: 2px 6px;
-    font-size: 0.6rem;
-    letter-spacing: 0.05em;
-  }
-}
 
 /* =========================================
    UTILITY

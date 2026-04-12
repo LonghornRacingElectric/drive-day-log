@@ -7,6 +7,13 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [2.1.3] - 2026-04-12
+
+### Improvements
+- Improved mobile view, header is less cluttered and buttons are bigger
+- Added session leaderboard and session averages to the PDF export
+
+
 ## [2.1.2] - 2026-04-12
 
 ### Improvements

@@ -64,7 +64,7 @@ export default function LapTable({
                         isBest ? 'lap-final-best' : 'lap-final-normal'
                       }
                     >
-                      {finalTime.toFixed(2)}s{isBest && ' ★'}
+                      {finalTime.toFixed(2)}s
                     </span>
                   ) : (
                     <span className="lap-final-dash">—</span>

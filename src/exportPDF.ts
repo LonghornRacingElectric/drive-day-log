@@ -229,6 +229,144 @@ export function exportDriveDayPDF(
 
   y += tcCardH + 5
 
+  // ── TOP 10 FASTEST LAPS ───────────────────────────────────────────────────
+  let allLaps: { driverName: string; vehicle: string; time: number }[] = []
+  drivers.forEach(d => {
+    d.laps.filter(l => !l.isLive).forEach(l => {
+      const ft = getFinalTime(l)
+      if (ft != null) allLaps.push({ driverName: d.name, vehicle: d.vehicle || '—', time: ft })
+    })
+  })
+  allLaps.sort((a,b) => a.time - b.time)
+  const top10 = allLaps.slice(0, 10)
+
+  if (top10.length > 0) {
+    const top10CardH = 10 + 7 + top10.length * 8 + 4
+    needsPageBreak(top10CardH + 5)
+    drawCard(doc, ML, y, CW, top10CardH)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(6.5)
+    rgb(doc, C.orange)
+    doc.text('SESSION LEADERBOARD', ML + 4, y + 6)
+
+    const cols = ['RANK', 'DRIVER', 'VEHICLE', 'TIME']
+    const colW = [16, (CW - 24) * 0.4, (CW - 24) * 0.4, (CW - 24) * 0.2]
+
+    let hx = ML + 4
+    let hy = y + 14
+    cols.forEach((h, i) => {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(5.5)
+      rgb(doc, C.textMuted)
+      doc.text(h, hx, hy)
+      hx += colW[i]
+    })
+
+    stroke(doc, C.border)
+    doc.setLineWidth(0.2)
+    doc.line(ML + 4, hy + 1.5, ML + CW - 4, hy + 1.5)
+
+    top10.forEach((row, ri) => {
+      const rx = ML + 4
+      const ry = hy + 5 + ri * 8
+      const vals = [
+        `#${ri + 1}`,
+        row.driverName,
+        row.vehicle,
+        fmtTime(row.time)
+      ]
+      
+      if (ri % 2 === 0) {
+        fill(doc, C.elevated)
+        doc.rect(ML + 2, ry - 3.5, CW - 4, 7.5, 'F')
+      }
+
+      let cx = rx
+      vals.forEach((v, i) => {
+        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
+        doc.setFontSize(8)
+        rgb(doc, i === 0 ? C.orangeL : i === 3 ? C.green : C.text)
+        doc.text(v, cx, ry)
+        cx += colW[i]
+      })
+    })
+
+    y += top10CardH + 5
+  }
+
+  // ── SESSION AVERAGES ──────────────────────────────────────────────────────
+  let sessionAvgs: { name: string; avg: number; stdDev: string }[] = []
+  drivers.forEach(d => {
+    const cleanLaps = d.laps.filter(l => !l.isLive)
+    if (cleanLaps.length === 0) return
+    const avg = getAverageTime(cleanLaps)
+    const stdDev = getStdDev(cleanLaps)
+    if (avg != null && cleanLaps.length > 0) {
+      sessionAvgs.push({
+        name: d.name,
+        avg,
+        stdDev: stdDev != null ? '±' + stdDev.toFixed(2) + 's' : '—'
+      })
+    }
+  })
+  sessionAvgs.sort((a,b) => a.avg - b.avg)
+
+  if (sessionAvgs.length > 0) {
+    const avgCardH = 10 + 7 + sessionAvgs.length * 8 + 4
+    needsPageBreak(avgCardH + 5)
+    drawCard(doc, ML, y, CW, avgCardH)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(6.5)
+    rgb(doc, C.orange)
+    doc.text('SESSION AVERAGES', ML + 4, y + 6)
+
+    const cols = ['RANK', 'DRIVER', 'AVERAGE TIME', 'CONSISTENCY']
+    const colW = [16, (CW - 24) * 0.4, (CW - 24) * 0.3, (CW - 24) * 0.3]
+
+    let hx = ML + 4
+    let hy = y + 14
+    cols.forEach((h, i) => {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(5.5)
+      rgb(doc, C.textMuted)
+      doc.text(h, hx, hy)
+      hx += colW[i]
+    })
+
+    stroke(doc, C.border)
+    doc.setLineWidth(0.2)
+    doc.line(ML + 4, hy + 1.5, ML + CW - 4, hy + 1.5)
+
+    sessionAvgs.forEach((row, ri) => {
+      const rx = ML + 4
+      const ry = hy + 5 + ri * 8
+      const vals = [
+        `#${ri + 1}`,
+        row.name,
+        fmtTime(row.avg),
+        row.stdDev
+      ]
+      
+      if (ri % 2 === 0) {
+        fill(doc, C.elevated)
+        doc.rect(ML + 2, ry - 3.5, CW - 4, 7.5, 'F')
+      }
+
+      let cx = rx
+      vals.forEach((v, i) => {
+        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
+        doc.setFontSize(8)
+        rgb(doc, i === 0 ? C.orangeL : i === 2 ? C.text : C.textSec)
+        doc.text(v, cx, ry)
+        cx += colW[i]
+      })
+    })
+
+    y += avgCardH + 5
+  }
+
   // ── STATE OF CHARGE ───────────────────────────────────────────────────────
   const socRows = sessionMeta.stateOfCharge.filter(
     (r) => r.initialSOC || r.finalSOC || r.initialVolts || r.finalVolts
@@ -469,7 +607,7 @@ export function exportDriveDayPDF(
           fmtTime(lap.time2),
           String(lap.cones),
           String(lap.offTrack),
-          finalTime != null ? finalTime.toFixed(2) + 's' + (isBest ? ' *' : '') : '—',
+          finalTime != null ? finalTime.toFixed(2) + 's' : '—',
         ]
 
         let vcx = ML + 3
