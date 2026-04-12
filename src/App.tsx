@@ -601,7 +601,7 @@ export default function App() {
 
       {/* ── Header ── */}
       <header className="app-header">
-        <div className="header-inner">
+        <div className="header-inner header-scrollable">
           <div className="header-brand">
             <img
               src="/lhr_logo.png"

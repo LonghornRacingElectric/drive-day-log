@@ -164,6 +164,26 @@ html.light-mode .app-header {
   position: relative;
 }
 
+@media (max-width: 600px) {
+  .header-scrollable {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .header-scrollable::-webkit-scrollbar {
+    height: 4px;
+  }
+  .header-scrollable::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .header-scrollable::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 4px;
+  }
+  .header-scrollable > * {
+    flex-shrink: 0;
+  }
+}
+
 .header-brand {
   display: flex;
   align-items: center;
