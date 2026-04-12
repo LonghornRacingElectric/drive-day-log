@@ -1353,7 +1353,7 @@ input[type="file"] {
 }
 
 .lb-time-gold {
-  color: var(--orange-light) !important;
+  color: var(--green) !important;
   font-weight: 700 !important;
 }
 

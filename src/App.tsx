@@ -35,11 +35,13 @@ import type { Lap } from './calculations'
 // Internal components
 import LapTable from './components/LapTable'
 import ConfirmModal from './components/ConfirmModal'
+import ExportModal from './components/ExportModal'
 import SessionGate from './components/SessionGate'
 
 // Internal types
 import type { Driver, SOCData, SessionMetadata } from './types/driveDay'
 import { exportDriveDayPDF } from './exportPDF'
+import { exportDriveDayXLSX } from './exportXLSX'
 import { useSession, defaultMeta } from './hooks/useSession'
 
 export default function App() {
@@ -97,6 +99,9 @@ export default function App() {
     confirmLabel: 'Delete',
     onConfirm: () => {},
   })
+
+  // Export modal
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   function openConfirm(opts: {
     title: string
@@ -587,6 +592,13 @@ export default function App() {
         onCancel={closeConfirm}
       />
 
+      <ExportModal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        onExportPDF={() => exportDriveDayPDF(sessionMeta, drivers)}
+        onExportXLSX={() => exportDriveDayXLSX(drivers)}
+      />
+
       {/* ── Header ── */}
       <header className="app-header">
         <div className="header-inner">
@@ -672,8 +684,8 @@ export default function App() {
               <button
                 id="export-pdf-btn"
                 className="btn btn-ghost"
-                onClick={() => exportDriveDayPDF(sessionMeta, drivers)}
-                title="Export drive day report as PDF"
+                onClick={() => setExportModalOpen(true)}
+                title="Export drive day report"
               >
                 <Download size={14} />
                 Export

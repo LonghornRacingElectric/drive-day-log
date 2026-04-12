@@ -286,7 +286,7 @@ export function exportDriveDayPDF(
       vals.forEach((v, i) => {
         doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
         doc.setFontSize(8)
-        rgb(doc, i === 0 ? C.orangeL : i === 3 ? C.green : C.text)
+        rgb(doc, i === 0 ? C.orangeL : (i === 3 && ri === 0) ? C.green : C.text)
         doc.text(v, cx, ry)
         cx += colW[i]
       })
@@ -358,7 +358,7 @@ export function exportDriveDayPDF(
       vals.forEach((v, i) => {
         doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
         doc.setFontSize(8)
-        rgb(doc, i === 0 ? C.orangeL : i === 2 ? C.text : C.textSec)
+        rgb(doc, i === 0 ? C.orangeL : (i === 2 && ri === 0) ? C.green : C.text)
         doc.text(v, cx, ry)
         cx += colW[i]
       })
