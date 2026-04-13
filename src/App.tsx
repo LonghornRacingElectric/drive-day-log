@@ -361,10 +361,12 @@ export default function App() {
     newLaps[liveLapIndex] = completedLap
     newLaps.push(newLiveLap)
 
-    await session.updateDriver(driver.id, {
+    // Fire off update without awaiting to prevent blocking timer reset on bad connection
+    session.updateDriver(driver.id, {
       ...fsDriver,
       laps: newLaps,
-    })
+    }).catch(console.error)
+
     startRef.current[driver.id] = Date.now()
     setActiveTimers((prev) => ({
       ...prev,
@@ -388,10 +390,11 @@ export default function App() {
         }
         const newLaps = [...fsDriver.laps]
         newLaps[liveLapIndex] = completedLap
-        await session.updateDriver(driverId, {
+        // Fire off update without awaiting
+        session.updateDriver(driverId, {
           ...fsDriver,
           laps: newLaps,
-        })
+        }).catch(console.error)
       }
     }
 
