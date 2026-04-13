@@ -7,6 +7,12 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [2.2.1] - 2026-04-12
+
+### Improvements
+- Added recent sessions to SessionGate
+
+
 ## [2.2.0] - 2026-04-12
 
 ### Improvements

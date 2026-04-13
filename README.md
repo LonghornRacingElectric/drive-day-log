@@ -1,7 +1,7 @@
 # Longhorn Racing Drive Day Log
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Deployed](https://img.shields.io/badge/deployed-vercel-black)
-![Version](https://img.shields.io/badge/version-2.2.0-blue)
+![Version](https://img.shields.io/badge/version-2.2.1-blue)
 
 A web-based tool for recording and analyzing drive day performance, now with **live multi-user sessions and role-based access control**.
 
@@ -86,4 +86,4 @@ Nathan Yee (Trackside Engineering)
 
 
 ## 📦 Version
-Current version: 2.2.0
+Current version: 2.2.1
