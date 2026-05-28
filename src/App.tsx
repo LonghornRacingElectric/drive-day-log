@@ -593,6 +593,7 @@ export default function App() {
       cones: 0,
       offTrack: 0,
       isLive: true,
+      startTimestamp: Date.now(),
     }
 
     const newLaps = [...fsDriver.laps]
