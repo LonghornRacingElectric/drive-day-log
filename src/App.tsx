@@ -819,7 +819,7 @@ export default function App() {
                   isAcceleration={isAcceleration}
                 />
 
-                {isAcceleration && (
+                {!isSkidpad && (
                   <MarshalTimerControls
                     driverId={driver.id}
                     liveLap={liveLap}
@@ -828,17 +828,6 @@ export default function App() {
                     onStop={(elapsed) => {
                       session.marshalCompleteLap(driver.id, elapsed).catch(console.error)
                     }}
-                  />
-                )}
-                {isSkidpad && (
-                  <SkidpadTimerControls
-                    driverId={driver.id}
-                    liveLap={liveLap}
-                    elapsed={activeTimers[driver.id]?.elapsed ?? 0}
-                    onStartSection1={() => session.skidpadStartSection1(driver.id).catch(console.error)}
-                    onStopSection1={(e) => session.skidpadStopSection1(driver.id, e).catch(console.error)}
-                    onStartSection2={() => session.skidpadStartSection2(driver.id).catch(console.error)}
-                    onStopSection2={(e) => session.skidpadStopSection2(driver.id, e).catch(console.error)}
                   />
                 )}
               </div>

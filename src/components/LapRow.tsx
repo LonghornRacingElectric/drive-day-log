@@ -77,7 +77,7 @@ export default function LapRow({
             ? activeSection === 1
               ? <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
               : isSkidpad && lap.time1 != null
-                ? <span className="lap-live-time" style={{ color: 'var(--green)' }}>{lap.time1.toFixed(3)}s</span>
+                ? <span className="lap-live-time" style={{ color: 'var(--orange-light)' }}>{lap.time1.toFixed(3)}s</span>
                 : <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
             : (
               <input
