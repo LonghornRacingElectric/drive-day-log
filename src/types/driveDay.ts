@@ -16,6 +16,7 @@ export type Driver = {
     sessionEnd: string
     vehicle: string
     comments: string
+    event?: string
 
     tires?: {
         frontRight: TireData

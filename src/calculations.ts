@@ -5,6 +5,8 @@ export type Lap = {
     cones: number
     offTrack: number
     isLive?: boolean
+    notes?: string
+    startTimestamp?: number   // epoch ms — set when the lap goes live, used by all clients to compute elapsed
 }
 
 export function getBaseTime(lap: Lap): number | null {

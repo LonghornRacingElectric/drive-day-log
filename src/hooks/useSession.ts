@@ -48,6 +48,14 @@ export interface SessionHook {
     field: 'cones' | 'offTrack',
     delta: number
   ) => Promise<void>
+  marshalCompleteLap: (
+    driverId: string,
+    elapsedSeconds: number
+  ) => Promise<void>
+  skidpadStartSection1: (driverId: string) => Promise<void>
+  skidpadStopSection1: (driverId: string, elapsed: number) => Promise<void>
+  skidpadStartSection2: (driverId: string) => Promise<void>
+  skidpadStopSection2: (driverId: string, elapsed: number) => Promise<void>
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -199,6 +207,25 @@ export function useSession(): SessionHook {
     await updateDoc(sessionRef(), { meta: defaultMeta, trackImage: null })
   }
 
+  // ── Marshal: complete a live lap via transaction (tx.update, not setDoc) ───
+  async function marshalCompleteLap(driverId: string, elapsedSeconds: number) {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(driverRef(driverId))
+      if (!snap.exists()) return
+      const driver = snap.data() as Driver
+      const newLaps = driver.laps.map((l) => {
+        if (!l.isLive) return l
+        return {
+          ...l,
+          time1: parseFloat(elapsedSeconds.toFixed(3)),
+          isLive: false,
+          // omit startTimestamp so it doesn't persist unnecessarily
+        }
+      })
+      tx.update(driverRef(driverId), { laps: newLaps })
+    })
+  }
+
   // ── Marshal cone/off-track increment (transaction-safe) ──────────────────
   async function marshalIncrement(
     driverId: string,
@@ -219,12 +246,65 @@ export function useSession(): SessionHook {
     })
   }
 
+  // ── Skidpad two-section timing (transaction-safe, works for admin & marshal) ─
+  async function skidpadStartSection1(driverId: string) {
+    const now = Date.now()
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(driverRef(driverId))
+      if (!snap.exists()) return
+      const d = snap.data() as Driver
+      const lap = { id: crypto.randomUUID(), time1: null, time2: null, cones: 0, offTrack: 0, isLive: true, startTimestamp: now }
+      tx.update(driverRef(driverId), { laps: [...d.laps, lap] })
+    })
+  }
+
+  async function skidpadStopSection1(driverId: string, elapsed: number) {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(driverRef(driverId))
+      if (!snap.exists()) return
+      const d = snap.data() as Driver
+      const newLaps = d.laps.map((l) => {
+        if (!l.isLive) return l
+        const { startTimestamp: _ts, ...rest } = l as any
+        return { ...rest, time1: parseFloat(elapsed.toFixed(3)) }
+      })
+      tx.update(driverRef(driverId), { laps: newLaps })
+    })
+  }
+
+  async function skidpadStartSection2(driverId: string) {
+    const now = Date.now()
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(driverRef(driverId))
+      if (!snap.exists()) return
+      const d = snap.data() as Driver
+      const newLaps = d.laps.map((l) => l.isLive ? { ...l, startTimestamp: now } : l)
+      tx.update(driverRef(driverId), { laps: newLaps })
+    })
+  }
+
+  async function skidpadStopSection2(driverId: string, elapsed: number) {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(driverRef(driverId))
+      if (!snap.exists()) return
+      const d = snap.data() as Driver
+      const newLaps = d.laps.map((l) => {
+        if (!l.isLive) return l
+        const { startTimestamp: _ts, ...rest } = l as any
+        return { ...rest, time2: parseFloat(elapsed.toFixed(3)), isLive: false }
+      })
+      tx.update(driverRef(driverId), { laps: newLaps })
+    })
+  }
+
   return {
     sessionCode, role, loading, connected,
     drivers, sessionMeta, trackImage,
     createSession, joinSession, leaveSession,
     addDriver, updateDriver, deleteDriver,
     updateMeta, updateTrackImage, resetAllDrivers,
-    marshalIncrement,
+    marshalIncrement, marshalCompleteLap,
+    skidpadStartSection1, skidpadStopSection1,
+    skidpadStartSection2, skidpadStopSection2,
   }
 }

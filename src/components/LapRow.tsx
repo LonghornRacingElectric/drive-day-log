@@ -6,6 +6,8 @@ type Props = {
   lap: Lap
   index: number
   activeElapsed: number
+  activeSection: 1 | 2 | null
+  isSkidpad: boolean
   onChange: (updated: Lap) => void
   onDelete: () => void
   isMarshal: boolean
@@ -15,6 +17,8 @@ export default function LapRow({
   lap,
   index,
   activeElapsed,
+  activeSection,
+  isSkidpad,
   onChange,
   onDelete,
   isMarshal,
@@ -69,43 +73,49 @@ export default function LapRow({
 
       {!isMarshal && (
         <td>
-          {lap.isLive ? (
-            <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
-          ) : (
-            <input
-              type="number"
-              inputMode="decimal"
-              value={lap.time1 ?? ''}
-              onChange={(e) =>
-                update(
-                  'time1',
-                  e.target.value === '' ? null : Number(e.target.value)
-                )
-              }
-              className="lap-time-input"
-            />
-          )}
+          {lap.isLive
+            ? activeSection === 1
+              ? <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
+              : isSkidpad && lap.time1 != null
+                ? <span className="lap-live-time" style={{ color: 'var(--green)' }}>{lap.time1.toFixed(3)}s</span>
+                : <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
+            : (
+              <input
+                type="number"
+                inputMode="decimal"
+                value={lap.time1 ?? ''}
+                onChange={(e) =>
+                  update('time1', e.target.value === '' ? null : Number(e.target.value))
+                }
+                className="lap-time-input"
+              />
+            )
+          }
         </td>
       )}
 
       {!isMarshal && (
         <td>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={lap.time2 ?? ''}
-            onChange={(e) =>
-              update(
-                'time2',
-                e.target.value === '' ? null : Number(e.target.value)
-              )
-            }
-            className="lap-time-input"
-          />
+          {lap.isLive && isSkidpad
+            ? activeSection === 2
+              ? <span className="lap-live-time">{activeElapsed.toFixed(2)}s</span>
+              : <span className="lap-final-dash">—</span>
+            : (
+              <input
+                type="number"
+                inputMode="decimal"
+                value={lap.time2 ?? ''}
+                onChange={(e) =>
+                  update('time2', e.target.value === '' ? null : Number(e.target.value))
+                }
+                className="lap-time-input"
+              />
+            )
+          }
         </td>
       )}
 
-      <td>
+      <td className="td-counter">
         <div className="counter-group">
           <button
             className="counter-btn"
@@ -123,7 +133,7 @@ export default function LapRow({
         </div>
       </td>
 
-      <td>
+      <td className="td-counter">
         <div className="counter-group">
           <button
             className="counter-btn"

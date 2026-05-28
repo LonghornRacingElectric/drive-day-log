@@ -164,20 +164,27 @@ html.light-mode .app-header {
   position: relative;
 }
 
-@media (max-width: 600px) {
+/* Horizontal scroll for nav — kicks in on narrow viewports */
+.header-scrollable {
+  -webkit-overflow-scrolling: touch;
+}
+.header-scrollable::-webkit-scrollbar {
+  height: 3px;
+}
+.header-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+.header-scrollable::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 4px;
+}
+
+@media (max-width: 700px) {
   .header-scrollable {
     overflow-x: auto;
+    justify-content: flex-start;
     padding-bottom: 4px;
-  }
-  .header-scrollable::-webkit-scrollbar {
-    height: 4px;
-  }
-  .header-scrollable::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .header-scrollable::-webkit-scrollbar-thumb {
-    background: var(--border-mid);
-    border-radius: 4px;
+    gap: 8px;
   }
   .header-scrollable > * {
     flex-shrink: 0;
@@ -852,6 +859,13 @@ input[type="checkbox"] {
   vertical-align: middle;
 }
 
+/* Tighter horizontal padding for counter + final cells to close the visual gap */
+.lap-table td.td-counter,
+.lap-table td.td-final {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
 .lap-table tbody tr:hover td {
   background: var(--bg-elevated);
 }
@@ -875,7 +889,7 @@ input[type="checkbox"] {
   border: 1px solid transparent;
   border-radius: 4px;
   outline: none;
-  width: 80px;
+  width: 100%;
   font-family: var(--font-mono);
   font-size: 0.82rem;
   color: var(--text-primary);
@@ -886,6 +900,27 @@ input[type="checkbox"] {
   background: var(--bg-input);
   border-color: var(--orange);
   box-shadow: 0 0 0 2px var(--orange-dim);
+}
+
+/* Notes column input */
+.lap-notes-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  outline: none;
+  width: 100%;
+  min-width: 100px;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 4px 6px;
+  transition: all 0.15s;
+}
+.lap-notes-input:focus {
+  background: var(--bg-input);
+  border-color: var(--orange);
+  box-shadow: 0 0 0 2px var(--orange-dim);
+  color: var(--text-primary);
 }
 
 .lap-live-time {

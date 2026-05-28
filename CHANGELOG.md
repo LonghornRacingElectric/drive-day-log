@@ -7,6 +7,15 @@ and this project follows Semantic Versioning.
 
 ---
 
+## [2.2.2] - 2026-05-27
+
+### Fixes
+- Fixed timer synchronization architecture
+- Two people can start/stop timer (mainly for acceleration uses)
+- Events are now tied to stints instead of global
+- Skidpad for logic
+
+
 ## [2.2.1] - 2026-04-12
 
 ### Improvements

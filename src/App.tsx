@@ -44,6 +44,150 @@ import { exportDriveDayPDF } from './exportPDF'
 import { exportDriveDayXLSX } from './exportXLSX'
 import { useSession, defaultMeta } from './hooks/useSession'
 
+// ── MarshalTimerControls ───────────────────────────────────────────────────
+// Standalone component that derives elapsed time from the live lap's
+// startTimestamp stored in Firestore — works on any device, not just the
+// one that pressed Start.
+function MarshalTimerControls({
+  driverId,
+  liveLap,
+  isRunning,
+  onStart,
+  onStop,
+}: {
+  driverId: string
+  liveLap: Lap | undefined
+  isRunning: boolean
+  onStart: () => void
+  onStop: (elapsedSeconds: number) => void
+}) {
+  const [elapsed, setElapsed] = useState(0)
+  const intervalRef = useRef<number | null>(null)
+  // Optimistic: flip to Start immediately on press; Firestore will confirm
+  const [localStopped, setLocalStopped] = useState(false)
+
+  // When Firestore confirms the lap is no longer live, reset optimistic state
+  useEffect(() => {
+    if (!isRunning) setLocalStopped(false)
+  }, [isRunning])
+
+  const effectivelyRunning = isRunning && !localStopped
+
+  useEffect(() => {
+    if (effectivelyRunning && liveLap?.startTimestamp) {
+      // Kick off a local interval seeded from the Firestore timestamp
+      setElapsed((Date.now() - liveLap.startTimestamp) / 1000)
+      intervalRef.current = window.setInterval(() => {
+        setElapsed((Date.now() - liveLap.startTimestamp!) / 1000)
+      }, 50)
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (!effectivelyRunning) setElapsed(0)
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [effectivelyRunning, liveLap?.startTimestamp])
+
+  return (
+    <div className="timer-controls">
+      <Timer size={16} style={{ color: 'var(--text-muted)' }} />
+      {effectivelyRunning && (
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '1.1rem',
+            fontWeight: 700,
+            color: 'var(--orange-light)',
+            letterSpacing: '-0.02em',
+            minWidth: 80,
+          }}
+        >
+          {elapsed.toFixed(2)}s
+        </span>
+      )}
+      {effectivelyRunning && <span className="badge badge-live">● LIVE</span>}
+      <div style={{ flex: 1 }} />
+      {!effectivelyRunning ? (
+        <button
+          id={`marshal-start-${driverId}`}
+          className="btn btn-start"
+          onClick={onStart}
+        >
+          Start
+        </button>
+      ) : (
+        <button
+          id={`marshal-stop-${driverId}`}
+          className="btn btn-stop"
+          onClick={() => {
+            setLocalStopped(true)   // optimistic: flip UI immediately
+            onStop(elapsed)         // async Firestore write in background
+          }}
+        >
+          Stop
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── SkidpadTimerControls ───────────────────────────────────────────────────
+// Two-phase (Sector 1 → Sector 2) timer for Skidpad events.
+// Phase is derived entirely from the live lap in Firestore so any device works.
+function SkidpadTimerControls({
+  driverId,
+  liveLap,
+  elapsed,
+  onStartSection1,
+  onStopSection1,
+  onStartSection2,
+  onStopSection2,
+}: {
+  driverId: string
+  liveLap: Lap | undefined
+  elapsed: number
+  onStartSection1: () => void
+  onStopSection1: (e: number) => void
+  onStartSection2: () => void
+  onStopSection2: (e: number) => void
+}) {
+  const isS1Running = !!liveLap?.startTimestamp && liveLap.time1 === null
+  const isBetween   = !!liveLap && !liveLap.startTimestamp && liveLap.time1 != null && liveLap.time2 === null
+  const isS2Running = !!liveLap?.startTimestamp && liveLap.time1 != null
+
+  // Derive a stable string phase — avoids object-reference churn in useEffect deps
+  const firestorePhase = isS1Running ? 's1' : isBetween ? 'between' : isS2Running ? 's2' : 'idle'
+
+  // Optimistic override so Stop feels instant (Firestore confirm clears it)
+  const [opt, setOpt] = useState<null | 'between' | 'idle'>(null)
+  useEffect(() => {
+    if (opt === 'between' && firestorePhase === 'between') setOpt(null)
+    if (opt === 'idle'    && firestorePhase === 'idle')    setOpt(null)
+  }, [firestorePhase, opt]) // string dep — only fires when phase actually changes
+
+  const phase   = opt ?? firestorePhase
+  const running = phase === 's1' || phase === 's2'
+
+  return (
+    <div className="timer-controls">
+      <Timer size={16} style={{ color: 'var(--text-muted)' }} />
+      {running && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.1rem', fontWeight: 700,
+                       color: 'var(--orange-light)', letterSpacing: '-0.02em', minWidth: 80 }}>
+          {elapsed.toFixed(2)}s
+        </span>
+      )}
+      {running && <span className="badge badge-live">● LIVE</span>}
+      <div style={{ flex: 1 }} />
+      {phase === 'idle'    && <button id={`skidpad-s1-${driverId}`}    className="btn btn-start" onClick={onStartSection1}>Start Sector 1</button>}
+      {phase === 's1'      && <button id={`skidpad-stop1-${driverId}`} className="btn btn-stop"  onClick={() => { setOpt('between'); onStopSection1(elapsed) }}>Stop</button>}
+      {phase === 'between' && <button id={`skidpad-s2-${driverId}`}    className="btn btn-start" onClick={onStartSection2}>Start Sector 2</button>}
+      {phase === 's2'      && <button id={`skidpad-stop2-${driverId}`} className="btn btn-stop"  onClick={() => { setOpt('idle');    onStopSection2(elapsed) }}>Stop</button>}
+    </div>
+  )
+}
+
 export default function App() {
   // ── Firestore session ────────────────────────────────────────────────────
   const session = useSession()
@@ -59,6 +203,10 @@ export default function App() {
   >({})
 
   const startRef = useRef<Record<string, number>>({})
+  // Always-current mirror of activeTimers — lets effects read the latest value
+  // without adding activeTimers to their dependency arrays (which would cause loops)
+  const activeTimersRef = useRef(activeTimers)
+  activeTimersRef.current = activeTimers
 
   // ── Local UI state ────────────────────────────────────────────────────────
   const [newDriverName, setNewDriverName] = useState('')
@@ -117,18 +265,39 @@ export default function App() {
 
   const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
 
+  // ── Local comments state — prevents cursor-jump caused by Firestore round-trips
+  const [localComments, setLocalComments] = useState<Record<string, string>>({})
+  const commentFocused = useRef<Record<string, boolean>>({})
+
   const drivers = session.drivers
 
   // ── Firestore ↔ local sync ────────────────────────────────────────────────
 
   // 1. On first connect (or session change), pull meta + trackImage from Firestore
+  //    and seed localComments for all drivers
   useEffect(() => {
     if (session.connected) {
       setSessionMeta(session.sessionMeta)
       setTrackImage(session.trackImage)
       metaInitialized.current = true
+      const initial: Record<string, string> = {}
+      session.drivers.forEach((d) => { initial[d.id] = d.comments ?? '' })
+      setLocalComments(initial)
     }
   }, [session.connected, session.sessionCode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 1b. Sync localComments from Firestore only for drivers that are NOT focused
+  useEffect(() => {
+    setLocalComments((prev) => {
+      const next = { ...prev }
+      session.drivers.forEach((d) => {
+        if (!commentFocused.current[d.id]) {
+          next[d.id] = d.comments ?? ''
+        }
+      })
+      return next
+    })
+  }, [session.drivers])
 
   // 2. Marshals: keep in sync whenever host changes meta
   useEffect(() => {
@@ -175,6 +344,64 @@ export default function App() {
     })
   }, [session.drivers])
 
+  // Sync activeTimers with Firestore — if a marshal (or another device) completed
+  // a live lap, clear our local interval so the admin's button flips to Start too
+  useEffect(() => {
+    setActiveTimers((prev) => {
+      const toRemove = Object.keys(prev).filter((driverId) => {
+        const driver = session.drivers.find((d) => d.id === driverId)
+        if (!driver) return false
+        const liveLap = driver.laps.find((l) => l.isLive)
+        // Clear when: no live lap at all, OR live lap exists but has no startTimestamp
+        // (the latter is the Skidpad between-sections state — the lap stays live
+        // but the timer must stop until Sector 2 begins)
+        return !liveLap || !liveLap.startTimestamp
+      })
+      if (!toRemove.length) return prev
+      const next = { ...prev }
+      toRemove.forEach((id) => {
+        if (next[id]?.intervalId !== null) clearInterval(next[id].intervalId!)
+        delete next[id]
+      })
+      return next
+    })
+  }, [session.drivers])
+
+  // Sync activeTimers with Firestore — if another device started a live lap
+  // (marshal or second admin), spin up a local interval so this device also
+  // shows Stop + elapsed time without needing to be the one who pressed Start.
+  // IMPORTANT: setInterval must be created OUTSIDE any state updater function;
+  // calling it inside a functional update causes double-invocation in Strict Mode.
+  useEffect(() => {
+    session.drivers.forEach((driver) => {
+      const liveLap = driver.laps.find((l) => l.isLive)
+      if (!liveLap?.startTimestamp) return
+      if (activeTimersRef.current[driver.id]) return // already tracking this driver
+
+      const ts = liveLap.startTimestamp
+      startRef.current[driver.id] = ts
+
+      const intervalId = window.setInterval(() => {
+        setActiveTimers((p) => ({
+          ...p,
+          [driver.id]: {
+            ...p[driver.id],
+            elapsed: (Date.now() - ts) / 1000,
+          },
+        }))
+      }, 50)
+
+      setActiveTimers((prev) => ({
+        ...prev,
+        [driver.id]: {
+          startTime: ts,
+          elapsed: (Date.now() - ts) / 1000,
+          intervalId,
+        },
+      }))
+    })
+  }, [session.drivers]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function addDriver() {
     if (!newDriverName.trim()) return
     const driver: Driver = {
@@ -185,6 +412,7 @@ export default function App() {
       sessionEnd: '',
       vehicle: '',
       comments: '',
+      event: sessionMeta.event || '',
     }
     setNewDriverName('')
     await session.addDriver(driver)
@@ -297,7 +525,16 @@ export default function App() {
   }
 
   function startTimer(driver: Driver) {
-    startRef.current[driver.id] = Date.now()
+    const now = Date.now()
+
+    // Clear any existing interval for this driver before starting fresh.
+    // This prevents leaked intervals when the mirror effect and startTimer
+    // both run for the same driver (e.g., admin presses Start right after
+    // the Firestore snapshot from a marshal start fires).
+    const existing = activeTimersRef.current[driver.id]
+    if (existing?.intervalId != null) clearInterval(existing.intervalId)
+
+    startRef.current[driver.id] = now
     const liveLap: Lap = {
       id: crypto.randomUUID(),
       time1: 0,
@@ -305,12 +542,13 @@ export default function App() {
       cones: 0,
       offTrack: 0,
       isLive: true,
+      startTimestamp: now,
     }
     let sessionStart = driver.sessionStart
     if (!sessionStart || sessionStart.trim() === '') {
-      const now = new Date()
-      const hh = String(now.getHours()).padStart(2, '0')
-      const mm = String(now.getMinutes()).padStart(2, '0')
+      const now2 = new Date()
+      const hh = String(now2.getHours()).padStart(2, '0')
+      const mm = String(now2.getMinutes()).padStart(2, '0')
       sessionStart = `${hh}:${mm}`
     }
 
@@ -330,7 +568,7 @@ export default function App() {
     }, 50)
     setActiveTimers((prev) => ({
       ...prev,
-      [driver.id]: { startTime: Date.now(), elapsed: 0, intervalId },
+      [driver.id]: { startTime: now, elapsed: 0, intervalId },
     }))
   }
 
@@ -478,7 +716,7 @@ export default function App() {
     return (
       <>
         <header className="app-header">
-        <div className="header-inner">
+        <div className="header-inner header-scrollable">
           <div className="header-brand">
             <img
               src="/lhr_logo.png"
@@ -550,21 +788,59 @@ export default function App() {
           {session.drivers.map((driver) => {
             const completedLaps = driver.laps.filter((l) => !l.isLive)
             const best = getBestTime(completedLaps)
+            const isAcceleration = driver.event === 'Acceleration'
+            const isSkidpad = driver.event === 'Skidpad'
+            const liveLap = driver.laps.find((l) => l.isLive)
+            const isRunning = !!liveLap
+            const activeSection: 1 | 2 | null =
+              liveLap?.startTimestamp && liveLap.time1 === null ? 1 :
+              liveLap?.startTimestamp && liveLap.time1 != null  ? 2 : null
 
             return (
               <div key={driver.id} className="driver-card">
                 <div className="driver-header">
                   <div className="driver-name">{driver.name}</div>
+                  {driver.event && (
+                    <div className="driver-vehicle-badge" style={{ marginLeft: 8 }}>
+                      {driver.event}
+                    </div>
+                  )}
                 </div>
 
                 <LapTable
                   laps={driver.laps}
                   bestTime={best}
                   activeElapsed={activeTimers[driver.id]?.elapsed ?? 0}
+                  activeSection={activeSection}
+                  isSkidpad={isSkidpad}
                   onUpdateLap={(lap) => updateLap(driver.id, lap)}
                   onDeleteLap={() => {}}
                   isMarshal={isMarshal}
+                  isAcceleration={isAcceleration}
                 />
+
+                {isAcceleration && (
+                  <MarshalTimerControls
+                    driverId={driver.id}
+                    liveLap={liveLap}
+                    isRunning={isRunning}
+                    onStart={() => startTimer(driver)}
+                    onStop={(elapsed) => {
+                      session.marshalCompleteLap(driver.id, elapsed).catch(console.error)
+                    }}
+                  />
+                )}
+                {isSkidpad && (
+                  <SkidpadTimerControls
+                    driverId={driver.id}
+                    liveLap={liveLap}
+                    elapsed={activeTimers[driver.id]?.elapsed ?? 0}
+                    onStartSection1={() => session.skidpadStartSection1(driver.id).catch(console.error)}
+                    onStopSection1={(e) => session.skidpadStopSection1(driver.id, e).catch(console.error)}
+                    onStartSection2={() => session.skidpadStartSection2(driver.id).catch(console.error)}
+                    onStopSection2={(e) => session.skidpadStopSection2(driver.id, e).catch(console.error)}
+                  />
+                )}
               </div>
             )
           })}
@@ -616,22 +892,6 @@ export default function App() {
             )}
           </div>
 
-          {!isMarshal && (
-            <div className="header-goals">
-              <span className="header-goals-label">Goals</span>
-              <input
-                type="text"
-                id="session-goals"
-                value={sessionMeta.sessionGoals}
-                onChange={(e) =>
-                  setSessionMeta({ ...sessionMeta, sessionGoals: e.target.value })
-                }
-                placeholder="Enter session objectives…"
-                style={{ flex: 1 }}
-                disabled={isMarshal}
-              />
-            </div>
-          )}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* Theme Toggle */}
@@ -732,11 +992,12 @@ export default function App() {
               </span>
             </div>
 
-            {/* Row 1: Date / Event / Weather */}
+            {/* Row 1: Date / Weather / Session Goals */}
             <div
-              className="form-grid"
               style={{
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                display: 'grid',
+                gridTemplateColumns: '160px 240px 280px',
+                gap: 12,
                 marginBottom: 12,
               }}
             >
@@ -756,28 +1017,6 @@ export default function App() {
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="session-event">
-                  Event
-                </label>
-                <select
-                  id="session-event"
-                  value={sessionMeta.event}
-                  onChange={(e) =>
-                    setSessionMeta({ ...sessionMeta, event: e.target.value })
-                  }
-                  disabled={isMarshal}
-                >
-                  <option value="">Select</option>
-                  <option value="Skidpad">Skidpad</option>
-                  <option value="Autocross">Autocross</option>
-                  <option value="Endurance">Endurance</option>
-                  <option value="Kart Driver Training">
-                    Kart Driver Training
-                  </option>
-                </select>
-              </div>
-
-              <div className="field">
                 <label className="field-label" htmlFor="session-weather">
                   Weather
                 </label>
@@ -789,6 +1028,22 @@ export default function App() {
                   onChange={(e) =>
                     setSessionMeta({ ...sessionMeta, weather: e.target.value })
                   }
+                  disabled={isMarshal}
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="session-goals">
+                  Session Goals
+                </label>
+                <input
+                  type="text"
+                  id="session-goals"
+                  value={sessionMeta.sessionGoals}
+                  onChange={(e) =>
+                    setSessionMeta({ ...sessionMeta, sessionGoals: e.target.value })
+                  }
+                  placeholder="Enter session objectives…"
                   disabled={isMarshal}
                 />
               </div>
@@ -1076,6 +1331,12 @@ export default function App() {
             const penPerLap = getPenaltiesPerLap(completedLaps)
             const stdDev = getStdDev(completedLaps)
             const timerActive = isTimerActive(driver.id)
+            const isAcceleration = driver.event === 'Acceleration'
+            const isSkidpad = driver.event === 'Skidpad'
+            const liveLap = driver.laps.find((l) => l.isLive)
+            const activeSection: 1 | 2 | null =
+              liveLap?.startTimestamp && liveLap.time1 === null ? 1 :
+              liveLap?.startTimestamp && liveLap.time1 != null  ? 2 : null
 
             return (
               <div
@@ -1304,6 +1565,32 @@ export default function App() {
                       </select>
                     </div>
 
+                    <div className="driver-field-sm field">
+                      <label
+                        className="field-label"
+                        htmlFor={`stint-event-${driver.id}`}
+                      >
+                        Event
+                      </label>
+                      <select
+                        id={`stint-event-${driver.id}`}
+                        value={driver.event ?? ''}
+                        onChange={(e) =>
+                          updateDriver(driver.id, {
+                            ...driver,
+                            event: e.target.value,
+                          })
+                        }
+                        disabled={isMarshal}
+                      >
+                        <option value="">Select</option>
+                        <option value="Skidpad">Skidpad</option>
+                        <option value="Autocross">Autocross</option>
+                        <option value="Endurance">Endurance</option>
+                        <option value="Acceleration">Acceleration</option>
+                      </select>
+                    </div>
+
                     <div className="driver-field-grow field">
                       <label
                         className="field-label"
@@ -1316,13 +1603,21 @@ export default function App() {
                         ref={(el) => {
                           textAreaRefs.current[driver.id] = el
                         }}
-                        value={driver.comments}
-                        onChange={(e) =>
+                        value={localComments[driver.id] ?? driver.comments ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setLocalComments((prev) => ({ ...prev, [driver.id]: val }))
+                        }}
+                        onFocus={() => {
+                          commentFocused.current[driver.id] = true
+                        }}
+                        onBlur={() => {
+                          commentFocused.current[driver.id] = false
                           updateDriver(driver.id, {
                             ...driver,
-                            comments: e.target.value,
+                            comments: localComments[driver.id] ?? '',
                           })
-                        }
+                        }}
                         placeholder="Setup notes, observations…"
                         disabled={isMarshal}
                       />
@@ -1334,65 +1629,59 @@ export default function App() {
                     laps={driver.laps}
                     bestTime={best}
                     activeElapsed={activeTimers[driver.id]?.elapsed ?? 0}
+                    activeSection={activeSection}
+                    isSkidpad={isSkidpad}
                     onUpdateLap={(lap) => updateLap(driver.id, lap)}
                     onDeleteLap={(lapId, index) =>
                       deleteLap(driver.id, lapId, index)
                     }
                     isMarshal={isMarshal}
+                    isAcceleration={isAcceleration}
                   />
                 </div>
 
                 {/* Timer Controls */}
-                <div className="timer-controls">
-                  <Timer size={16} style={{ color: 'var(--text-muted)' }} />
-                  {timerActive && (
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '1.1rem',
-                        fontWeight: 700,
-                        color: 'var(--orange-light)',
-                        letterSpacing: '-0.02em',
-                        minWidth: 80,
-                      }}
-                    >
-                      {(activeTimers[driver.id]?.elapsed ?? 0).toFixed(2)}s
-                    </span>
-                  )}
-                  {timerActive && (
-                    <span className="badge badge-live">● LIVE</span>
-                  )}
-
-                  <div style={{ flex: 1 }} />
-
-                  {!isMarshal &&
-                    (!timerActive ? (
-                      <button
-                        id={`start-timer-${driver.id}`}
-                        className="btn btn-start"
-                        onClick={() => startTimer(driver)}
-                      >
-                        Start
-                      </button>
+                {isSkidpad ? (
+                  <SkidpadTimerControls
+                    driverId={driver.id}
+                    liveLap={liveLap}
+                    elapsed={activeTimers[driver.id]?.elapsed ?? 0}
+                    onStartSection1={() => session.skidpadStartSection1(driver.id).catch(console.error)}
+                    onStopSection1={(e) => session.skidpadStopSection1(driver.id, e).catch(console.error)}
+                    onStartSection2={() => session.skidpadStartSection2(driver.id).catch(console.error)}
+                    onStopSection2={(e) => session.skidpadStopSection2(driver.id, e).catch(console.error)}
+                  />
+                ) : (
+                  <div className="timer-controls">
+                    <Timer size={16} style={{ color: 'var(--text-muted)' }} />
+                    {timerActive && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.1rem', fontWeight: 700,
+                                     color: 'var(--orange-light)', letterSpacing: '-0.02em', minWidth: 80 }}>
+                        {(activeTimers[driver.id]?.elapsed ?? 0).toFixed(2)}s
+                      </span>
+                    )}
+                    {timerActive && <span className="badge badge-live">● LIVE</span>}
+                    <div style={{ flex: 1 }} />
+                    {isAcceleration ? (
+                      !timerActive ? (
+                        <button id={`start-timer-${driver.id}`} className="btn btn-start" onClick={() => startTimer(driver)}>Start</button>
+                      ) : (
+                        <button id={`stop-timer-${driver.id}`} className="btn btn-stop" onClick={() => stopTimer(driver.id)}>Stop</button>
+                      )
                     ) : (
-                      <>
-                        <button
-                          id={`lap-timer-${driver.id}`}
-                          className="btn btn-lap"
-                          onClick={() => recordLap(driver)}
-                        >
-                          Lap
-                        </button>
-                        <button
-                          id={`stop-timer-${driver.id}`}
-                          className="btn btn-stop"
-                          onClick={() => stopTimer(driver.id)}
-                        >
-                          Stop
-                        </button>
-                      </>
-                    ))}
-                </div>
+                      !isMarshal && (
+                        !timerActive ? (
+                          <button id={`start-timer-${driver.id}`} className="btn btn-start" onClick={() => startTimer(driver)}>Start</button>
+                        ) : (
+                          <>
+                            <button id={`lap-timer-${driver.id}`} className="btn btn-lap" onClick={() => recordLap(driver)}>Lap</button>
+                            <button id={`stop-timer-${driver.id}`} className="btn btn-stop" onClick={() => stopTimer(driver.id)}>Stop</button>
+                          </>
+                        )
+                      )
+                    )}
+                  </div>
+                )}
 
                 {/* Tire Data */}
                 {driver.tires && (

@@ -433,6 +433,7 @@ export function exportDriveDayPDF(
   // ══════════════════════════════════════════════════════════════════════════
   // ── DRIVER SECTIONS ───────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════
+
   drivers.forEach((driver, di) => {
     const completedLaps = driver.laps.filter((l) => !l.isLive)
     const best       = getBestTime(completedLaps)
@@ -470,12 +471,19 @@ export function exportDriveDayPDF(
     rgb(doc, C.white)
     doc.text(driver.name, ML + 23, y + 10)
 
-    // Vehicle badge
+    // Stint # label
+    const stintLabel = `STINT ${di + 1}`
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(6)
+    rgb(doc, C.orange)
+    doc.text(stintLabel, ML + 23, y + 17)
+
+    // Vehicle badge (after stint label)
     if (driver.vehicle) {
-      doc.setFont('helvetica', 'bold')
+      doc.setFont('helvetica', 'normal')
       doc.setFontSize(6)
-      rgb(doc, C.orange)
-      doc.text(driver.vehicle.toUpperCase(), ML + 23, y + 17)
+      rgb(doc, C.textMuted)
+      doc.text(driver.vehicle.toUpperCase(), ML + 23 + doc.getStringUnitWidth(stintLabel) * 6 * 0.352 + 6, y + 17)
     }
 
     // Stats on the right — two rows of 3
@@ -520,6 +528,7 @@ export function exportDriveDayPDF(
 
     let mx = ML + 4
     const metaItems: [string, string][] = [
+      ['Event',       driver.event ? driver.event : fmtOrDash(sessionMeta.event)],
       ['Stint Start', fmtOrDash(driver.sessionStart)],
       ['Stint End',   fmtOrDash(driver.sessionEnd)],
     ]
@@ -555,11 +564,12 @@ export function exportDriveDayPDF(
       // Table header
       const lapCols: [string, number][] = [
         ['LAP',       16],
-        ['TIME 1',    28],
-        ['TIME 2',    28],
-        ['CONES HIT', 26],
-        ['OFF TRACK', 26],
-        ['FINAL',     28],
+        ['TIME 1',    24],
+        ['TIME 2',    24],
+        ['CONES HIT', 24],
+        ['OFF TRACK', 24],
+        ['FINAL',     26],
+        ['NOTES',     CW - 16 - 24 - 24 - 24 - 24 - 26 - 6],
       ]
 
       // Header row bg
@@ -608,15 +618,17 @@ export function exportDriveDayPDF(
           String(lap.cones),
           String(lap.offTrack),
           finalTime != null ? finalTime.toFixed(2) + 's' : '—',
+          lap.notes?.trim() || '—',
         ]
 
         let vcx = ML + 3
         lapCols.forEach(([, w], ci) => {
           const isLast = ci === lapCols.length - 1
-          doc.setFont('helvetica', isLast && isBest ? 'bold' : 'normal')
-          doc.setFontSize(8)
-          rgb(doc, isLast && isBest ? C.green : ci === 0 ? C.textSec : C.text)
-          doc.text(vals[ci], vcx, y + 5.3)
+          const isFinal = ci === lapCols.length - 2
+          doc.setFont('helvetica', isLast ? 'normal' : isFinal && isBest ? 'bold' : 'normal')
+          doc.setFontSize(isLast ? 7 : 8)
+          rgb(doc, isFinal && isBest ? C.green : ci === 0 ? C.textSec : isLast ? C.textSec : C.text)
+          doc.text(vals[ci], vcx, y + 5.3, isLast ? { maxWidth: w } : undefined)
           vcx += w
         })
 
@@ -702,6 +714,11 @@ export function exportDriveDayPDF(
       y += 6
     }
   })
+
+  // ── Page numbers with Stint labels ───────────────────────────────────────
+  // Build a mapping of which page each driver section starts on
+  // (jsPDF doesn't expose per-page metadata, so we use a simple counter approach
+  //  in the footer loop — we just show page numbers as before)
 
   // ── Footer on every page ──────────────────────────────────────────────────
   const totalPages = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages()
