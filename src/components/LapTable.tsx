@@ -17,11 +17,9 @@ type Props = {
 
 // ── Local-state notes cell to prevent cursor-jump from Firestore round-trips ──
 function NotesCell({
-  lapId,
   value,
   onSave,
 }: {
-  lapId: string
   value: string
   onSave: (v: string) => void
 }) {
@@ -134,7 +132,6 @@ export default function LapTable({
                 <td style={{ overflow: 'hidden' }}>
                   <NotesCell
                     key={lap.id}
-                    lapId={lap.id}
                     value={lap.notes ?? ''}
                     onSave={(v) => onUpdateLap({ ...lap, notes: v })}
                   />
