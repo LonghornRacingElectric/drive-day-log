@@ -819,7 +819,7 @@ export default function App() {
                   isAcceleration={isAcceleration}
                 />
 
-                {!isSkidpad && (
+                {isAcceleration && (
                   <MarshalTimerControls
                     driverId={driver.id}
                     liveLap={liveLap}
