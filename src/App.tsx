@@ -29,6 +29,7 @@ import {
   getPenaltiesPerLap,
   getStdDev,
   getFinalTime,
+  isSkidpadDNF,
 } from './calculations'
 import type { Lap } from './calculations'
 
@@ -1315,14 +1316,18 @@ export default function App() {
           {/* ── Driver Cards ── */}
           {drivers.map((driver) => {
             const completedLaps = driver.laps.filter((lap) => !lap.isLive)
-            const best = getBestTime(completedLaps)
-            const avg = getAverageTime(completedLaps)
-            const penalties = getTotalPenalties(completedLaps)
-            const penPerLap = getPenaltiesPerLap(completedLaps)
-            const stdDev = getStdDev(completedLaps)
-            const timerActive = isTimerActive(driver.id)
             const isAcceleration = driver.event === 'Acceleration'
             const isSkidpad = driver.event === 'Skidpad'
+            // For skidpad, DNF laps (off-track > 0) are excluded from all stats
+            const scoredLaps = isSkidpad
+              ? completedLaps.filter((lap) => !isSkidpadDNF(lap))
+              : completedLaps
+            const best = getBestTime(completedLaps, isSkidpad)
+            const avg = getAverageTime(completedLaps, isSkidpad)
+            const penalties = getTotalPenalties(scoredLaps)
+            const penPerLap = getPenaltiesPerLap(completedLaps, isSkidpad)
+            const stdDev = getStdDev(completedLaps, isSkidpad)
+            const timerActive = isTimerActive(driver.id)
             const liveLap = driver.laps.find((l) => l.isLive)
             const activeSection: 1 | 2 | null =
               liveLap?.startTimestamp && liveLap.time1 === null ? 1 :
@@ -1390,14 +1395,14 @@ export default function App() {
                     </div>
                     <div className="stat-chip">
                       <div className="label">Laps</div>
-                      <div className="value">{completedLaps.length}</div>
+                      <div className="value">{scoredLaps.length}</div>
                     </div>
                     <div className="stat-chip">
                       <div className="label">Penalties</div>
                       <div
                         className={`value ${penalties > 0 ? 'penalty' : ''}`}
                       >
-                        {completedLaps.length ? penalties : '—'}
+                        {scoredLaps.length ? penalties : '—'}
                       </div>
                     </div>
                     <div className="stat-chip">
@@ -1810,10 +1815,11 @@ export default function App() {
             }
             const entries: LBEntry[] = []
             drivers.forEach((driver) => {
+              const driverIsSkidpad = driver.event === 'Skidpad'
               driver.laps
                 .filter((l) => !l.isLive)
                 .forEach((lap, i) => {
-                  const t = getFinalTime(lap)
+                  const t = getFinalTime(lap, driverIsSkidpad)
                   if (t != null)
                     entries.push({
                       name: driver.name,
@@ -1907,9 +1913,10 @@ export default function App() {
               { vehicle: string; times: number[] }
             > = {}
             drivers.forEach((driver) => {
+              const driverIsSkidpad = driver.event === 'Skidpad'
               const completedLaps = driver.laps.filter((l) => !l.isLive)
               const times = completedLaps
-                .map((l) => getFinalTime(l))
+                .map((l) => getFinalTime(l, driverIsSkidpad))
                 .filter((t): t is number => t != null)
               if (!times.length) return
               if (!driverMap[driver.name]) {

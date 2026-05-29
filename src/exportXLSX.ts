@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Driver } from './types/driveDay'
-import { getFinalTime } from './calculations'
+import { getFinalTime, isSkidpadDNF } from './calculations'
 
 export function exportDriveDayXLSX(drivers: Driver[]) {
   // Create a new workbook
@@ -20,9 +20,11 @@ export function exportDriveDayXLSX(drivers: Driver[]) {
     const stintNumber = eventCounters[stintEvent]
 
     // Build rows for this specific stint
+    const isSkidpad = stintEvent === 'Skidpad'
     const rows = completedLaps.map((lap, lapIndex) => {
+      const dnf = isSkidpad && isSkidpadDNF(lap)
       const rawTime = (lap.time1 || 0) + (lap.time2 ? lap.time2 : 0)
-      const finalTime = getFinalTime(lap)
+      const finalTime = dnf ? null : getFinalTime(lap, isSkidpad)
 
       return {
         'Run #': lapIndex + 1,

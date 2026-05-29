@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 import type { Driver, SessionMetadata } from './types/driveDay'
-import { getFinalTime, getBestTime, getAverageTime, getTotalPenalties, getPenaltiesPerLap, getStdDev } from './calculations'
+import { getFinalTime, getBestTime, getAverageTime, getTotalPenalties, getPenaltiesPerLap, getStdDev, isSkidpadDNF } from './calculations'
 
 // ── Color palette ──────────────────────────────────────────────────────────
 const C = {
@@ -232,8 +232,9 @@ export function exportDriveDayPDF(
   // ── TOP 10 FASTEST LAPS ───────────────────────────────────────────────────
   let allLaps: { driverName: string; vehicle: string; time: number }[] = []
   drivers.forEach(d => {
+    const driverIsSkidpad = d.event === 'Skidpad'
     d.laps.filter(l => !l.isLive).forEach(l => {
-      const ft = getFinalTime(l)
+      const ft = getFinalTime(l, driverIsSkidpad)
       if (ft != null) allLaps.push({ driverName: d.name, vehicle: d.vehicle || '—', time: ft })
     })
   })
@@ -298,10 +299,11 @@ export function exportDriveDayPDF(
   // ── SESSION AVERAGES ──────────────────────────────────────────────────────
   let sessionAvgs: { name: string; avg: number; stdDev: string }[] = []
   drivers.forEach(d => {
+    const driverIsSkidpad = d.event === 'Skidpad'
     const cleanLaps = d.laps.filter(l => !l.isLive)
     if (cleanLaps.length === 0) return
-    const avg = getAverageTime(cleanLaps)
-    const stdDev = getStdDev(cleanLaps)
+    const avg = getAverageTime(cleanLaps, driverIsSkidpad)
+    const stdDev = getStdDev(cleanLaps, driverIsSkidpad)
     if (avg != null && cleanLaps.length > 0) {
       sessionAvgs.push({
         name: d.name,
@@ -436,11 +438,15 @@ export function exportDriveDayPDF(
 
   drivers.forEach((driver, di) => {
     const completedLaps = driver.laps.filter((l) => !l.isLive)
-    const best       = getBestTime(completedLaps)
-    const avg        = getAverageTime(completedLaps)
-    const penalties  = getTotalPenalties(completedLaps)
-    const penPerLap  = getPenaltiesPerLap(completedLaps)
-    const stdDev     = getStdDev(completedLaps)
+    const driverIsSkidpad = driver.event === 'Skidpad'
+    const scoredLaps = driverIsSkidpad
+      ? completedLaps.filter((l) => !isSkidpadDNF(l))
+      : completedLaps
+    const best       = getBestTime(completedLaps, driverIsSkidpad)
+    const avg        = getAverageTime(completedLaps, driverIsSkidpad)
+    const penalties  = getTotalPenalties(scoredLaps)
+    const penPerLap  = getPenaltiesPerLap(completedLaps, driverIsSkidpad)
+    const stdDev     = getStdDev(completedLaps, driverIsSkidpad)
 
     // Estimate space needed: header + fields + laps + (optional tires)
     const lapH    = completedLaps.length * 8 + 28
@@ -490,10 +496,10 @@ export function exportDriveDayPDF(
     const statsRow1: [string, string, boolean][] = [
       ['BEST',       fmtTime(best),                            true ],
       ['AVG',        fmtTime(avg),                             false],
-      ['LAPS',       String(completedLaps.length),             false],
+      ['LAPS',       String(scoredLaps.length),               false],
     ]
     const statsRow2: [string, string, boolean][] = [
-      ['PENALTIES',  completedLaps.length ? String(penalties) : '—',               penalties > 0],
+      ['PENALTIES',  scoredLaps.length ? String(penalties) : '—',               penalties > 0],
       ['PEN / LAP',  penPerLap != null ? penPerLap.toFixed(2) : '—',               false],
       ['CONSISTENCY', stdDev != null ? '+/-' + stdDev.toFixed(2) + 's' : '—',     false],
     ]
@@ -592,8 +598,9 @@ export function exportDriveDayPDF(
 
       completedLaps.forEach((lap, li) => {
         needsPageBreak(9)
-        const finalTime = getFinalTime(lap)
-        const isBest = finalTime != null && best != null && finalTime === best
+        const dnf = driverIsSkidpad && isSkidpadDNF(lap)
+        const finalTime = dnf ? null : getFinalTime(lap, driverIsSkidpad)
+        const isBest = !dnf && finalTime != null && best != null && finalTime === best
 
         // Alternating row background
         if (li % 2 === 0) {
@@ -617,7 +624,7 @@ export function exportDriveDayPDF(
           fmtTime(lap.time2),
           String(lap.cones),
           String(lap.offTrack),
-          finalTime != null ? finalTime.toFixed(2) + 's' : '—',
+          dnf ? 'DNF' : (finalTime != null ? finalTime.toFixed(2) + 's' : '—'),
           lap.notes?.trim() || '—',
         ]
 
@@ -627,7 +634,8 @@ export function exportDriveDayPDF(
           const isFinal = ci === lapCols.length - 2
           doc.setFont('helvetica', isLast ? 'normal' : isFinal && isBest ? 'bold' : 'normal')
           doc.setFontSize(isLast ? 7 : 8)
-          rgb(doc, isFinal && isBest ? C.green : ci === 0 ? C.textSec : isLast ? C.textSec : C.text)
+          const isDNFCell = isFinal && dnf
+          rgb(doc, isDNFCell ? C.red : isFinal && isBest ? C.green : ci === 0 ? C.textSec : isLast ? C.textSec : C.text)
           doc.text(vals[ci], vcx, y + 5.3, isLast ? { maxWidth: w } : undefined)
           vcx += w
         })

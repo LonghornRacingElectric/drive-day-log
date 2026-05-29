@@ -1,5 +1,5 @@
 import type { Lap } from '../calculations'
-import { getFinalTime } from '../calculations'
+import { getFinalTime, isSkidpadDNF } from '../calculations'
 import LapRow from './LapRow'
 import { useState, useEffect, useRef } from 'react'
 
@@ -97,9 +97,13 @@ export default function LapTable({
 
         <tbody>
           {laps.map((lap, index) => {
-            const finalTime = getFinalTime(lap)
+            const dnf = isSkidpad && isSkidpadDNF(lap)
+            const finalTime = dnf ? null : getFinalTime(lap, isSkidpad)
             const isBest =
-              finalTime != null && bestTime != null && finalTime === bestTime
+              !dnf &&
+              finalTime != null &&
+              bestTime != null &&
+              finalTime === bestTime
 
             return (
               <tr key={lap.id}>
@@ -115,7 +119,9 @@ export default function LapTable({
                 />
 
                 <td className="td-final">
-                  {finalTime != null && !lap.isLive ? (
+                  {dnf && !lap.isLive ? (
+                    <span style={{ color: 'var(--red)', fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }}>DNF</span>
+                  ) : finalTime != null && !lap.isLive ? (
                     <span
                       className={
                         isBest ? 'lap-final-best' : 'lap-final-normal'

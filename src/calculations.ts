@@ -15,10 +15,23 @@ export function getBaseTime(lap: Lap): number | null {
     return (lap.time1 + lap.time2) / 2
 }
 
-export function getFinalTime(lap: Lap): number | null {
+/** Returns true when a skidpad lap should be treated as a DNF (off-track > 0). */
+export function isSkidpadDNF(lap: Lap): boolean {
+    return lap.offTrack > 0
+}
+
+/**
+ * Computes the final scored time for a lap.
+ * - Regular events: +2s per cone, +20s per off-track
+ * - Skidpad (isSkidpad=true): +0.125s per cone, off-track = DNF (returns null)
+ */
+export function getFinalTime(lap: Lap, isSkidpad = false): number | null {
     const { time1, time2, cones, offTrack } = lap
   
     if (time1 == null && time2 == null) return null
+
+    // Skidpad: off-track is an automatic DNF
+    if (isSkidpad && offTrack > 0) return null
   
     let baseTime: number
   
@@ -27,22 +40,26 @@ export function getFinalTime(lap: Lap): number | null {
     } else {
       baseTime = time1 ?? time2!
     }
+
+    if (isSkidpad) {
+      return baseTime + 0.125 * cones
+    }
   
     return baseTime + 2 * cones + 20 * offTrack
 }
 
 
-export function getBestTime(laps: Lap[]): number | null {
+export function getBestTime(laps: Lap[], isSkidpad = false): number | null {
     const times = laps
-      .map(getFinalTime)
+      .map((l) => getFinalTime(l, isSkidpad))
       .filter((t): t is number => t != null)
   
     return times.length ? Math.min(...times) : null
 }
 
-export function getAverageTime(laps: Lap[]): number | null {
+export function getAverageTime(laps: Lap[], isSkidpad = false): number | null {
     const times = laps
-      .map(getFinalTime)
+      .map((l) => getFinalTime(l, isSkidpad))
       .filter((t): t is number => t != null)
   
     if (!times.length) return null
@@ -53,14 +70,16 @@ export function getTotalPenalties(laps: Lap[]): number {
     return laps.reduce((sum, l) => sum + l.cones + l.offTrack, 0)
 }
 
-export function getPenaltiesPerLap(laps: Lap[]): number | null {
-    if (!laps.length) return null
-    return getTotalPenalties(laps) / laps.length
+export function getPenaltiesPerLap(laps: Lap[], isSkidpad = false): number | null {
+    // For skidpad, DNF laps are excluded from denominator
+    const scoredLaps = isSkidpad ? laps.filter((l) => !isSkidpadDNF(l)) : laps
+    if (!scoredLaps.length) return null
+    return getTotalPenalties(scoredLaps) / scoredLaps.length
 }
 
-export function getStdDev(laps: Lap[]): number | null {
+export function getStdDev(laps: Lap[], isSkidpad = false): number | null {
     const times = laps
-      .map(getFinalTime)
+      .map((l) => getFinalTime(l, isSkidpad))
       .filter((t): t is number => t != null)
 
     if (times.length < 2) return null
